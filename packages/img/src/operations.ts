@@ -26,7 +26,8 @@ import {
   suffixPath,
   text,
 } from "@dtst/internal";
-import { imgErrors } from "./errors";
+import { imgErrors, withImageModelHint } from "./errors";
+import { resolveImageModel } from "./model";
 import { filenameFromPrompt } from "./prompt";
 import { resolveBackend } from "./backends/select";
 import type { BackendKind, EditRequest, GenerateRequest, RenderedImage, Usage } from "./backends/types";
@@ -102,15 +103,19 @@ export const MAX_INLINE_IMAGES = 4;
 export const MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export async function runGenerate(input: GenerateOperationInput, context: OperationContext): Promise<OperationOutcome> {
-  const request = toGenerateRequest(input);
-  const selection = await resolveBackend(context.config, { model: request.model, log: context.log }, context.signal);
+  const model = resolveImageModel(context.config, input.model);
+  const request = toGenerateRequest({ ...input, model });
+  const selection = await resolveBackend(context.config, { model, log: context.log }, context.signal);
   const started = Date.now();
-  const result = await selection.backend.generate(request, context);
+  const result = await selection.backend.generate(request, context).catch((error: unknown) => {
+    throw withImageModelHint(error, model);
+  });
   return finalize(result, input, context, selection.backend.kind, Date.now() - started);
 }
 
 export async function runEdit(input: EditOperationInput, context: OperationContext): Promise<OperationOutcome> {
-  const selection = await resolveBackend(context.config, { model: input.model, log: context.log }, context.signal);
+  const model = resolveImageModel(context.config, input.model);
+  const selection = await resolveBackend(context.config, { model, log: context.log }, context.signal);
   if (!selection.backend.capabilities.edit || !selection.backend.edit) throw imgErrors.editUnsupported(selection.backend.kind);
   if (input.mask && !selection.backend.capabilities.mask) throw imgErrors.maskUnsupported(selection.backend.kind);
 
@@ -128,14 +133,18 @@ export async function runEdit(input: EditOperationInput, context: OperationConte
     : undefined;
 
   const request: EditRequest = {
-    ...toGenerateRequest(input),
+    ...toGenerateRequest({ ...input, model }),
     images,
     ...(mask ? { mask } : {}),
     ...(input.input_fidelity === undefined ? {} : { inputFidelity: input.input_fidelity }),
   };
 
   const started = Date.now();
-  const result = await selection.backend.edit(request, context);
+  const result = await selection.backend
+    .edit(request, context)
+    .catch((error: unknown) => {
+      throw withImageModelHint(error, model);
+    });
   const outcome = await finalize(result, input, context, selection.backend.kind, Date.now() - started);
   if (skipped.length > 0) {
     outcome.notes.push(`Skipped ${skipped.length} input image(s): ${skipped.map((entry) => `${entry.source} (${entry.reason})`).join("; ")}`);

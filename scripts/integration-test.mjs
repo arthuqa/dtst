@@ -51,7 +51,7 @@ async function connect(pkg) {
     command: process.execPath,
     args: [entry],
     cwd: ROOT,
-    env: { ...process.env },
+    env: integrationEnv(pkg),
     stderr: "pipe",
   });
   const stderr = [];
@@ -59,6 +59,20 @@ async function connect(pkg) {
   const client = new Client({ name: "dtst-integration", version: "1.0.0" }, { capabilities: {} });
   await client.connect(transport);
   return { client, stderr, close: () => client.close() };
+}
+
+/**
+ * `OPENAI_MODEL` is the single model knob for both servers, so a test run that
+ * wants one model for text and another for images must use the product's
+ * override (`DTST_IMAGE_MODEL`). `OPENAI_IMAGE_MODEL` is accepted here purely
+ * as a test-time convenience and is never read by the servers themselves.
+ */
+function integrationEnv(pkg) {
+  const env = { ...process.env };
+  if (pkg === "img" && !env.DTST_IMAGE_MODEL && env.OPENAI_IMAGE_MODEL) {
+    env.DTST_IMAGE_MODEL = env.OPENAI_IMAGE_MODEL;
+  }
+  return env;
 }
 
 async function call(client, name, args, options = {}) {

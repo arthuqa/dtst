@@ -18,9 +18,10 @@ import type {
   ChatCompletion,
   ChatCompletionCreateParamsNonStreaming,
 } from "openai/resources/chat/completions";
-import { DtstError, type LoadedImage, toChatImagePart } from "@dtst/internal";
+import { type LoadedImage, toChatImagePart } from "@dtst/internal";
 import { composeChatPrompt, buildPrompt } from "../prompt";
 import { ERROR_UNSUPPORTED } from "../errors";
+import { resolveImageModel } from "../model";
 import { compact, isUnsupportedParameterError, parseDataUrlSafe, renderedImageFrom } from "./shared";
 import { buildModelList } from "./types";
 import type {
@@ -62,14 +63,12 @@ export class ChatModalitiesBackend implements ImageBackend {
   constructor(private readonly client: OpenAI) {}
 
   async generate(request: GenerateRequest, context: BackendContext): Promise<ImageResult> {
-    const model = request.model ?? context.config.imageModel;
-    if (!model) throw ERROR_UNSUPPORTED.missingModel();
+    const model = resolveImageModel(context.config, request.model);
     return this.runBatch(request, context, model, []);
   }
 
   async edit(request: EditRequest, context: BackendContext): Promise<ImageResult> {
-    const model = request.model ?? context.config.imageModel;
-    if (!model) throw ERROR_UNSUPPORTED.missingModel();
+    const model = resolveImageModel(context.config, request.model);
     if (request.images.length === 0) throw ERROR_UNSUPPORTED.needsInputImages();
     return this.runBatch(request, context, model, request.images);
   }
@@ -219,10 +218,7 @@ export class ChatModalitiesBackend implements ImageBackend {
       }
     }
     if (images.length === 0) {
-      const providerMessage = text ? ` Provider said: ${text.slice(0, 300)}` : "";
-      throw new DtstError("PROVIDER_ERROR", `The model did not return an image.${providerMessage}`, {
-        hint: "Check that the model produces images and that `modalities: [\"image\",\"text\"]` is supported. `list_image_models` shows candidates.",
-      });
+      throw ERROR_UNSUPPORTED.textInsteadOfImage(model, text ? text.slice(0, 300) : undefined);
     }
 
     const usage = response.usage;

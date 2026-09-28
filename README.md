@@ -9,7 +9,7 @@ top of any OpenAI-compatible API.
 | [`@dtst/txt`](packages/txt) | `npx @dtst/txt` | Writes text, reads workspace context, and reasons over one or many images. |
 
 Both speak OpenAI's wire format (`OPENAI_BASE_URL`, `OPENAI_API_KEY`,
-`OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`), work over MCP stdio, log only to
+`OPENAI_MODEL`), work over MCP stdio, log only to
 stderr, save atomically, redact secrets, and ship a CLI that mirrors the MCP
 tools so everything can be scripted and tested.
 
@@ -94,8 +94,8 @@ only when these repository secrets exist:
 | --- | --- |
 | `OPENAI_BASE_URL` | API root for the integration run. |
 | `OPENAI_API_KEY` | Key used for the few real calls. |
-| `OPENAI_MODEL` | Text model for the `txt` checks. |
-| `OPENAI_IMAGE_MODEL` | Image model for the `img` checks. |
+| `OPENAI_MODEL` | Model for the `txt` checks and the default for `img`. |
+| `DTST_IMAGE_MODEL` | Optional image-only model for the `img` checks. |
 
 Without them the job skips with a notice instead of failing.
 

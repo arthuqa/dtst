@@ -6,8 +6,13 @@
  *
  *   OPENAI_BASE_URL   e.g. https://openrouter.ai/api/v1   (required)
  *   OPENAI_API_KEY    bearer token                          (required, except for local endpoints)
- *   OPENAI_MODEL      default text model                    (@dtst/txt)
- *   OPENAI_IMAGE_MODEL default image model                  (@dtst/img)
+ *   OPENAI_MODEL      model for text AND images             (required by each call)
+ *
+ * `OPENAI_MODEL` is the single model knob for both servers: @dtst/txt uses it
+ * for chat, @dtst/img uses it as the default image model. When an endpoint
+ * needs a different model for images (a text model and an image model cannot
+ * be the same id), set `DTST_IMAGE_MODEL` — a namespaced *optional* override —
+ * or pass `model` per tool call.
  *
  * Everything else is optional and namespaced under DTST_*. A `.env` file is
  * discovered from the working directory upwards (clients such as Claude
@@ -29,7 +34,7 @@ export interface ProviderConfig {
   apiKey: string;
   /** Default text model (`OPENAI_MODEL`). */
   textModel?: string;
-  /** Default image model (`OPENAI_IMAGE_MODEL`). */
+  /** Optional image-model override (`DTST_IMAGE_MODEL`); falls back to `textModel`. */
   imageModel?: string;
   timeoutMs: number;
   maxRetries: number;
@@ -241,7 +246,8 @@ export function resolveConfig(options: ResolveOptions): ProviderConfig {
 
   const textModel = readString(env, "OPENAI_MODEL", "DTST_MODEL");
   if (textModel) config.textModel = textModel;
-  const imageModel = readString(env, "OPENAI_IMAGE_MODEL", "DTST_IMAGE_MODEL");
+  // Optional: only needed when images come from a different model than text.
+  const imageModel = readString(env, "DTST_IMAGE_MODEL", "DTST_IMAGE_MODEL_ID");
   if (imageModel) config.imageModel = imageModel;
   const outputDir = readString(env, "DTST_OUTPUT_DIR");
   if (outputDir) config.outputDir = outputDir;
@@ -309,7 +315,7 @@ export function configSummary(config: ProviderConfig): Record<string, unknown> {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey ? "set" : config.allowNoApiKey ? "not required for this endpoint" : "missing",
     textModel: config.textModel ?? null,
-    imageModel: config.imageModel ?? null,
+    imageModel: config.imageModel ?? config.textModel ?? null,
     textApi: config.textApi,
     imageBackend: config.imageBackend,
     timeoutMs: config.timeoutMs,

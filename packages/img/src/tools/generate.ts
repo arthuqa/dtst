@@ -46,7 +46,7 @@ export function registerGenerateImageTool(server: ServerLike, runtime: ToolRunti
       title: "Generate image",
       description: [
         "Create one or more images from a text prompt and save them to disk.",
-        "Uses the configured OpenAI-compatible endpoint (OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_IMAGE_MODEL).",
+        "Uses the configured OpenAI-compatible endpoint (OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL).",
         "Returns each image inline when small enough, a resource link for every saved file, and absolute paths in structured content.",
         "Use `output_path`/`output_dir`/`filename` when the file must land in a specific place; otherwise images are written to the workspace root.",
       ].join(" "),

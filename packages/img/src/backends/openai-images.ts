@@ -25,6 +25,7 @@ import type {
 } from "./types";
 import { buildModelList } from "./types";
 import { ERROR_UNSUPPORTED } from "../errors";
+import { resolveImageModel } from "../model";
 import { compact, isUnsupportedParameterError, mimeFromOutputFormat, renderedImageFrom, toUploadable } from "./shared";
 import { buildPrompt } from "../prompt";
 import { createOpenAIClient } from "@dtst/internal";
@@ -43,8 +44,7 @@ export class OpenAIImagesBackend implements ImageBackend {
   constructor(private readonly client: OpenAI) {}
 
   async generate(request: GenerateRequest, context: BackendContext): Promise<ImageResult> {
-    const model = request.model ?? context.config.imageModel;
-    if (!model) throw ERROR_UNSUPPORTED.missingModel();
+    const model = resolveImageModel(context.config, request.model);
 
     const full = compact({
       model,
@@ -75,8 +75,7 @@ export class OpenAIImagesBackend implements ImageBackend {
   }
 
   async edit(request: EditRequest, context: BackendContext): Promise<ImageResult> {
-    const model = request.model ?? context.config.imageModel;
-    if (!model) throw ERROR_UNSUPPORTED.missingModel();
+    const model = resolveImageModel(context.config, request.model);
     if (request.images.length === 0) throw ERROR_UNSUPPORTED.needsInputImages();
 
     const uploadables = await Promise.all(request.images.map((image, index) => toUploadable(image, index)));

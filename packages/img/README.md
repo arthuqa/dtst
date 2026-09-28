@@ -15,7 +15,7 @@ npx @dtst/img                 # MCP stdio server (what MCP clients run)
 ```bash
 export OPENAI_BASE_URL=https://openrouter.ai/api/v1   # any OpenAI-compatible root
 export OPENAI_API_KEY=sk-...
-export OPENAI_IMAGE_MODEL=google/gemini-3.1-flash-image
+export OPENAI_MODEL=google/gemini-3.1-flash-image     # the model knob for text and images
 
 npx @dtst/img generate "a red panda astronaut, studio lighting" --out-dir ./out
 npx @dtst/img models --query image --limit 20
@@ -24,6 +24,10 @@ npx @dtst/img models --query image --limit 20
 `.env` files are discovered from the working directory upwards, so a project
 `.env` is enough when an MCP client (Claude Desktop, opencode, Cursor, …)
 launches the server without inheriting your shell environment.
+
+Running both servers against one endpoint? Set `OPENAI_MODEL` to your text
+model and `DTST_IMAGE_MODEL` to your image model — `@dtst/img` falls back to
+`OPENAI_MODEL` when no image override is set.
 
 ## MCP client configuration
 
@@ -36,7 +40,7 @@ launches the server without inheriting your shell environment.
       "env": {
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENAI_API_KEY": "sk-...",
-        "OPENAI_IMAGE_MODEL": "google/gemini-3.1-flash-image",
+        "OPENAI_MODEL": "google/gemini-3.1-flash-image",
         "DTST_WORKSPACE": "/absolute/path/to/project"
       }
     }
@@ -48,6 +52,10 @@ launches the server without inheriting your shell environment.
 `output_dir` values resolve against it instead of the client's working
 directory, which is not always the project root.
 
+The image model comes from `OPENAI_MODEL`. If your endpoint uses a different
+model for images than for text (common on gateways such as OpenRouter), set
+`DTST_IMAGE_MODEL` — or pass `model` on the call. `list_image_models` shows
+what is available.
 ## Tools
 
 | Tool | Purpose |
@@ -104,7 +112,8 @@ returns for models that belong to the other route). Force a protocol with
 | --- | --- | --- |
 | `OPENAI_BASE_URL` | – (required) | API root. `/v1` is added when missing; endpoint suffixes are stripped. |
 | `OPENAI_API_KEY` | – (required) | Bearer token. Optional for localhost endpoints unless `DTST_ALLOW_NO_API_KEY=0`. |
-| `OPENAI_IMAGE_MODEL` | – | Default model for every call. |
+| `OPENAI_MODEL` | – | Model used for every image call (shared with `@dtst/txt`). |
+| `DTST_IMAGE_MODEL` | – | Optional image-only override when it differs from `OPENAI_MODEL`. |
 | `DTST_IMG_BACKEND` | `auto` | `auto`, `images`, `openrouter` or `chat`. |
 | `DTST_WORKSPACE` | cwd | Root for relative output paths. |
 | `DTST_OUTPUT_DIR` | workspace | Default output directory. |
@@ -139,6 +148,7 @@ diagnostics go to stderr. Exit codes: `0` success, `1` runtime/provider error,
 | `CONFIG_MISSING: OPENAI_BASE_URL is not set` | Export it, or put it in a `.env` next to the project. MCP clients do not inherit your shell. |
 | `PROVIDER_UNSUPPORTED … cannot be used with the chat/completions endpoint` | The model belongs to another route. `auto` already retries; if you forced a backend, unset `DTST_IMG_BACKEND`. |
 | `400 unknown parameter` | The provider rejects an optional parameter; the server retries once with a minimal body, then reports the provider's message. |
+| `The model "…" returned text instead of an image` | `OPENAI_MODEL` is a chat model. Pass an image `model` (see `list_image_models`) or set `DTST_IMAGE_MODEL`. |
 | Images look cropped or oddly sized | Providers clamp sizes. Prefer `size` for OpenAI-style models, `aspect_ratio`/`resolution` for OpenRouter models. |
 | Output landed in the wrong directory | Set `DTST_WORKSPACE`, or pass an absolute `output_path`. |
 

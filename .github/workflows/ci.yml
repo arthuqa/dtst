@@ -82,7 +82,8 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          OPENAI_IMAGE_MODEL: ${{ secrets.OPENAI_IMAGE_MODEL }}
+          # Optional: only needed when images come from a different model.
+          DTST_IMAGE_MODEL: ${{ secrets.DTST_IMAGE_MODEL }}
         run: node scripts/integration-test.mjs
 
       - name: Upload integration artifacts

@@ -127,14 +127,22 @@ describe("resolveConfig: mapping of optional variables", () => {
     const config = resolveConfig({
       env: {
         ...base,
-        OPENAI_MODEL: "text-model",
-        OPENAI_IMAGE_MODEL: "image-model",
+        OPENAI_MODEL: "shared-model",
+        DTST_IMAGE_MODEL: "image-model",
         DTST_OUTPUT_DIR: "out",
       },
     });
-    expect(config.textModel).toBe("text-model");
+    expect(config.textModel).toBe("shared-model");
     expect(config.imageModel).toBe("image-model");
     expect(config.outputDir).toBe("out");
+  });
+
+  it("uses OPENAI_MODEL as the image model and ignores a stray OPENAI_IMAGE_MODEL", () => {
+    const config = resolveConfig({ env: { ...base, OPENAI_MODEL: "shared-model", OPENAI_IMAGE_MODEL: "legacy-model" } });
+    expect(config.textModel).toBe("shared-model");
+    // One model knob: images fall back to OPENAI_MODEL unless DTST_IMAGE_MODEL is set.
+    expect(config.imageModel).toBeUndefined();
+    expect(configSummary(config)["imageModel"]).toBe("shared-model");
   });
 
   it("parses DTST_EXTRA_BODY and DTST_EXTRA_HEADERS as JSON objects", () => {

@@ -3,6 +3,7 @@ import { type ServerLike, defineTool, jsonText, ok, text } from "@dtst/internal"
 import { listImageModels } from "../backends/select";
 import type { ToolRuntime } from "../runtime";
 import { clampLimit } from "./schema";
+import { describeDefaultModel } from "../model";
 
 export const listImageModelsSchema = z.object({
   query: z.string().optional().describe("Case-insensitive substring filter over model id, name and description."),
@@ -57,7 +58,7 @@ export function registerListImageModelsTool(server: ServerLike, runtime: ToolRun
               `models: ${models.length}${input.query ? ` matching "${input.query}"` : ""}`,
               ...lines,
               "",
-              `Default image model: ${config.imageModel ?? "(OPENAI_IMAGE_MODEL is not set)"}`,
+              `Default image model: ${describeDefaultModel(config)}`,
             ].join("\n"),
           ),
         ],

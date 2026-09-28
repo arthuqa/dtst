@@ -3,7 +3,7 @@
  * because the caller is usually an agent that can fix the input.
  */
 
-import { DtstError, badInput } from "@dtst/internal";
+import { DtstError, badInput, toDtstError } from "@dtst/internal";
 import type { BackendKind } from "./backends/types";
 
 export const imgErrors = {
@@ -12,7 +12,7 @@ export const imgErrors = {
 
   missingModel: (): DtstError =>
     new DtstError("CONFIG_MISSING", "No image model selected.", {
-      hint: "Pass `model`, or set OPENAI_IMAGE_MODEL (e.g. meta/muse-image, google/gemini-3.1-flash-image, gpt-image-1).",
+      hint: "Pass `model`, or set OPENAI_MODEL (the shared model knob) — or DTST_IMAGE_MODEL when images come from a different model. Examples: meta/muse-image, google/gemini-3.1-flash-image, gpt-image-1.",
     }),
 
   needsInputImages: (): DtstError =>
@@ -21,6 +21,11 @@ export const imgErrors = {
   emptyResponse: (): DtstError =>
     new DtstError("PROVIDER_ERROR", "The provider returned no images.", {
       hint: "Retry once, and check that the model actually produces images (see `list_image_models`).",
+    }),
+
+  textInsteadOfImage: (model: string, providerMessage?: string): DtstError =>
+    new DtstError("PROVIDER_ERROR", `The model "${model}" returned text instead of an image.${providerMessage ? ` Provider said: ${providerMessage}` : ""}`, {
+      hint: "OPENAI_MODEL is probably a chat model. Pass an image `model` explicitly (see `list_image_models`) or set DTST_IMAGE_MODEL.",
     }),
 
   maskUnsupported: (backend: BackendKind): DtstError =>
@@ -36,6 +41,32 @@ export const imgErrors = {
   batchNotSupported: (backend: BackendKind, max: number): DtstError =>
     badInput(`The ${backend} backend supports at most ${max} image(s) per call.`, "Lower `n`, or repeat the call."),
 };
+
+/**
+ * When a generation fails because the model cannot produce images, the
+ * provider's own message rarely says so plainly. This rewrites the hint —
+ * and only the hint — for model/endpoint-shaped failures, leaving auth,
+ * rate-limit, timeout and network errors untouched.
+ */
+export function withImageModelHint(error: unknown, model: string | undefined): DtstError {
+  const dtst = toDtstError(error);
+  const modelShaped =
+    dtst.code === "PROVIDER_UNSUPPORTED" ||
+    /output modalities|no model found|not a valid model|unsupported model|does not support (the )?(requested )?(output|modality|image)/i.test(
+      dtst.message,
+    );
+  if (!modelShaped || ["PROVIDER_AUTH", "PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT", "NETWORK", "CANCELLED"].includes(dtst.code)) {
+    return dtst;
+  }
+  const label = model?.trim() ? `"${model.trim()}"` : "the configured model";
+  return new DtstError(dtst.code, dtst.message, {
+    ...(dtst.status === undefined ? {} : { status: dtst.status }),
+    retryable: dtst.retryable,
+    ...(dtst.details === undefined ? {} : { details: dtst.details }),
+    cause: dtst.cause,
+    hint: `If OPENAI_MODEL points at a chat model, ${label} cannot generate images: pass an image \`model\` (see \`list_image_models\`) or set DTST_IMAGE_MODEL.`,
+  });
+}
 
 /** Back-compat alias used by the backends. */
 export const ERROR_UNSUPPORTED = imgErrors;

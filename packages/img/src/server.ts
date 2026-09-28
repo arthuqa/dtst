@@ -25,8 +25,9 @@ import { registerListImageModelsTool } from "./tools/models";
 export const SERVER_INSTRUCTIONS = [
   "Image generation and editing for the local workspace.",
   "",
-  "Configuration (environment or .env): OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_IMAGE_MODEL (default model).",
-  "Optional: DTST_IMG_BACKEND=auto|images|openrouter|chat forces a wire protocol; DTST_WORKSPACE sets the path root;",
+  "Configuration (environment or .env): OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL (the model used for images).",
+  "Optional: DTST_IMAGE_MODEL overrides just the image model when it differs from OPENAI_MODEL;",
+  "DTST_IMG_BACKEND=auto|images|openrouter|chat forces a wire protocol; DTST_WORKSPACE sets the path root;",
   "DTST_ALLOWED_WRITE_ROOTS confines writes; DTST_OUTPUT_DIR redirects default output.",
   "",
   "Workflow:",

@@ -150,7 +150,7 @@ function generationFields(values: CliValues): Omit<GenerateOperationInput, "prom
 }
 
 const SHARED_OPTIONS = [
-  { name: "model", alias: "m", type: "string" as const, description: "Image model id (default: OPENAI_IMAGE_MODEL).", placeholder: "model" },
+  { name: "model", alias: "m", type: "string" as const, description: "Image model id (default: DTST_IMAGE_MODEL, else OPENAI_MODEL).", placeholder: "model" },
   { name: "n", type: "number" as const, description: "How many images to produce (1-10).", placeholder: "count" },
   { name: "size", type: "string" as const, description: 'Explicit size ("1024x1024") or an OpenRouter tier ("2K").', placeholder: "size" },
   { name: "aspect-ratio", type: "string" as const, description: 'Aspect ratio such as "16:9".', placeholder: "ratio" },
@@ -311,7 +311,8 @@ await runCli({
   env: [
     { name: "OPENAI_BASE_URL", description: "API root of any OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1", required: true },
     { name: "OPENAI_API_KEY", description: "Bearer token. Optional for localhost endpoints unless DTST_ALLOW_NO_API_KEY=0.", required: true },
-    { name: "OPENAI_IMAGE_MODEL", description: "Default image model for every call." },
+    { name: "OPENAI_MODEL", description: "Model used for images (and shared with @dtst/txt for text)." },
+    { name: "DTST_IMAGE_MODEL", description: "Optional override when images come from a different model than OPENAI_MODEL." },
     { name: "DTST_IMG_BACKEND", description: "auto (default) | images | openrouter | chat — force a wire protocol." },
     { name: "DTST_WORKSPACE", description: "Root for relative output paths (default: process cwd)." },
     { name: "DTST_OUTPUT_DIR", description: "Default directory for generated files." },
