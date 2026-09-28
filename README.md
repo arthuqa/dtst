@@ -1,117 +1,110 @@
 # dtst
 
-Two `npx`-able MCP servers that give agents real file-producing capabilities on
-top of any OpenAI-compatible API.
+Two MCP servers, on any OpenAI-compatible API:
 
-| Package | Command | What it does |
+| Package | Run it | What it gives the model |
 | --- | --- | --- |
-| [`@dtst/img`](packages/img) | `npx @dtst/img` | Generates and edits images, saves them wherever the agent asks, returns them inline. |
-| [`@dtst/txt`](packages/txt) | `npx @dtst/txt` | Writes text, reads workspace context, and reasons over one or many images. |
+| **`@dtst/img`** | `npx -y @dtst/img` | Generate and edit images, written wherever you ask. |
+| **`@dtst/txt`** | `npx -y @dtst/txt` | Write text, read files/URLs as context, look at images. |
 
-Both speak OpenAI's wire format (`OPENAI_BASE_URL`, `OPENAI_API_KEY`,
-`OPENAI_MODEL`), work over MCP stdio, log only to
-stderr, save atomically, redact secrets, and ship a CLI that mirrors the MCP
-tools so everything can be scripted and tested.
+## Configuration
 
-```jsonc
-// MCP client configuration
+```bash
+OPENAI_BASE_URL=https://openrouter.ai/api/v1   # or https://api.openai.com/v1, a gateway, ...
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=meta/muse-image                   # the model THIS server uses
+```
+
+Each server has its own `env` block, so `img` can use an image model while
+`txt` uses a text model. Optional: `DEBUG=true` for verbose logs on stderr.
+
+## Add to your client
+
+Use `@dtst/img` for images, `@dtst/txt` for text. This entry works as-is in
+Claude Desktop, Cursor, Windsurf, Cline and Roo Code:
+
+```json
 {
   "mcpServers": {
-    "img": { "command": "npx", "args": ["-y", "@dtst/img"] },
-    "txt": { "command": "npx", "args": ["-y", "@dtst/txt"] }
+    "img": {
+      "command": "npx",
+      "args": ["-y", "@dtst/img"],
+      "env": {
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENAI_API_KEY": "sk-...",
+        "OPENAI_MODEL": "meta/muse-image"
+      }
+    }
   }
 }
 ```
 
-## Repository layout
+| Client | Where it goes | Key |
+| --- | --- | --- |
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | `mcpServers` |
+| Cursor | `~/.cursor/mcp.json` or `.cursor/mcp.json` | `mcpServers` (add `"type": "stdio"`) |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `mcpServers` |
+| Cline | `~/.cline/mcp.json` | `mcpServers` |
+| Roo Code | `.roo/mcp.json` | `mcpServers` |
+| VS Code (Copilot) | `.vscode/mcp.json` | `servers` + `"type": "stdio"` |
+| Zed | Zed `settings.json` | `context_servers` |
+| JetBrains | Settings → Tools → AI Assistant → MCP → Add → STDIO | paste the JSON above |
 
-```
-packages/
-  internal/   private shared runtime (config, paths, images, MCP helpers)
-              — never published, inlined into each bundle by tsup
-  img/        @dtst/img  — backends: OpenAI images, OpenRouter images, chat modalities
-  txt/        @dtst/txt  — chat completions + responses, context gathering, vision
-scripts/
-  integration-test.mjs   spawns the built servers over MCP stdio and makes real calls
-  verify-packages.mjs    static + tarball + `npx --package <tgz>` verification
-  release.mjs            version bump, commit, tag, optional push
-.github/workflows/
-  ci.yml       typecheck · unit tests · build · package verification (Node 22 + 24)
-  publish.yml  tag-triggered publish to npm (Trusted Publishing or NPM_TOKEN)
+### opencode
+
+`opencode.json` — `command` is an array and env vars use `environment`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "img": {
+      "type": "local",
+      "command": ["npx", "-y", "@dtst/img"],
+      "environment": {
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENAI_API_KEY": "sk-...",
+        "OPENAI_MODEL": "meta/muse-image"
+      },
+      "enabled": true
+    }
+  }
+}
 ```
 
-## Working on it
+### Codex CLI
+
+`~/.codex/config.toml`:
+
+```toml
+[mcp_servers.img]
+command = "npx"
+args = ["-y", "@dtst/img"]
+
+[mcp_servers.img.env]
+OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+OPENAI_API_KEY = "sk-..."
+OPENAI_MODEL = "meta/muse-image"
+```
+
+### Command-line clients
 
 ```bash
-npm install
-npm run typecheck        # tsc --noEmit across workspaces
-npm test                 # vitest, no network
-npm run build            # tsup bundles: dist/index.js + dist/cli.js
-npm run verify:packages  # metadata, tarball contents, `npx <bin> --version`
-npm run check            # all of the above
+claude mcp add --transport stdio img \
+  --env OPENAI_API_KEY=sk-... --env OPENAI_MODEL=meta/muse-image \
+  -- npx -y @dtst/img
+
+codex mcp add img --env OPENAI_MODEL=meta/muse-image -- npx -y @dtst/img
+
+gemini mcp add -e OPENAI_MODEL=meta/muse-image img npx -y @dtst/img
 ```
 
-Live tests (they spend real credit, a few cents):
+Any other MCP client works the same way: run `npx -y @dtst/img`, pass the three
+variables through its env mechanism, and leave stdout alone (both servers log
+to stderr only).
 
-```bash
-npm run test:integration            # both servers, requires credentials
-node scripts/integration-test.mjs img
-node scripts/integration-test.mjs txt
-```
+## Development
 
-## Releasing
-
-1. **Create the npm scope/user** and make sure you can publish to it. Scoped
-   packages need `publishConfig.access: public` (already set) and a first
-   `npm publish` from an account that owns the scope.
-2. **Configure npm authentication** — the workflow supports both:
-   - *Trusted publishing (recommended, no secrets):* on npmjs.com open each
-     package → Settings → Trusted Publisher → GitHub Actions and fill in
-     `arthuqa` / `dtst` / `publish.yml` / allowed action `npm publish`.
-   - *Token fallback:* add an `NPM_TOKEN` repository secret (granular token with
-     read+write on the scope).
-3. **Publish:**
-
-   ```bash
-   npm run release -- img patch --push     # tags img-v0.1.1, pushes, publishes
-   npm run release -- txt minor --push
-   npm run release -- both 1.0.0 --push
-   ```
-
-   Or run the **Publish** workflow manually — it defaults to a dry run, which
-   builds and validates both tarballs without touching the registry.
-
-The publish job fails fast when a tag and `package.json` version disagree, when
-typechecks/unit tests fail, or when the packed tarball is missing files.
-
-### CI secrets
-
-`ci.yml` runs typecheck/unit/build/package verification on every push and PR
-with no secrets. The live integration job runs on `main` (and manual dispatch)
-only when these repository secrets exist:
-
-| Secret | Purpose |
-| --- | --- |
-| `OPENAI_BASE_URL` | API root for the integration run. |
-| `OPENAI_API_KEY` | Key used for the few real calls. |
-| `OPENAI_MODEL` | Model for the `txt` checks and the image model for `img`. |
-| `DTST_TEST_IMAGE_MODEL` | Optional: image model for the `img` checks when it differs from `OPENAI_MODEL`. |
-
-Without them the job skips with a notice instead of failing.
-
-## Design notes
-
-- **stdout is sacred.** MCP stdio owns it for JSON-RPC; every diagnostic goes to
-  stderr through a redacting logger.
-- **Errors are deliverables.** Tool failures return `isError` with a stable
-  `code`, the provider's message and an actionable `hint`; secrets are scrubbed.
-- **Writes are atomic and non-destructive** (temp file + `fsync` + rename,
-  `-1`/`-2` suffixes instead of clobbering) and can be confined with
-  `DTST_ALLOWED_WRITE_ROOTS`.
-- **Protocol autodetection.** Image models live behind three different wire
-  protocols; `@dtst/img` picks the right one per host/model and retries the
-  other on "model cannot be used with this endpoint" responses.
-- **One implementation per capability.** The CLI and the MCP tools call the same
-  operations layer, so behaviour cannot drift between them.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 MIT licensed.
