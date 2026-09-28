@@ -91,7 +91,7 @@ jobs:
           MATRIX: ${{ steps.select.outputs.matrix }}
         run: |
           set -euo pipefail
-          for pkg in $(printf '%s' "$MATRIX" | tr -d '[]"' | tr ',' ' '); do
+          for pkg in $(node -e 'for (const p of JSON.parse(process.env.MATRIX).package) console.log(p)'); do
             declared=$(node -p "require('./packages/$pkg/package.json').version")
             if [ "$declared" != "$VERSION" ]; then
               echo "::error::Tag says $VERSION but packages/$pkg/package.json is $declared"
