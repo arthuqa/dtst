@@ -4,7 +4,9 @@ export const modelField = z
   .string()
   .min(1)
   .optional()
-  .describe("Model id. Defaults to OPENAI_MODEL. Examples: openai/gpt-6-luna, anthropic/claude-opus-5.5, qwen/qwen3.8-max.");
+  .describe(
+    "Model id. Defaults to OPENAI_MODEL. Examples: openai/gpt-6-luna, anthropic/claude-opus-5.5, qwen/qwen3.8-max.",
+  );
 
 export const samplingFields = {
   model: modelField,
@@ -24,7 +26,10 @@ export const samplingFields = {
     .enum(["text", "markdown", "json"])
     .optional()
     .describe('Desired output shape. "json" switches on JSON mode and validates nothing else — check the result.'),
-  verbosity: z.enum(["concise", "balanced", "detailed"]).optional().describe("How much detail to produce. Defaults to balanced."),
+  verbosity: z
+    .enum(["concise", "balanced", "detailed"])
+    .optional()
+    .describe("How much detail to produce. Defaults to balanced."),
   stream: z
     .boolean()
     .optional()
@@ -38,7 +43,10 @@ export const saveFields = {
     .describe("Exact file (or directory) to write the result to; relative paths resolve against the workspace root."),
   output_dir: z.string().optional().describe("Directory to write into. Ignored when output_path is set."),
   filename: z.string().optional().describe("Preferred file name (an extension is added for the chosen `format`)."),
-  overwrite: z.boolean().optional().describe("Replace an existing file instead of adding a -1 suffix. Defaults to false."),
+  overwrite: z
+    .boolean()
+    .optional()
+    .describe("Replace an existing file instead of adding a -1 suffix. Defaults to false."),
   save: z
     .boolean()
     .optional()

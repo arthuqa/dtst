@@ -43,16 +43,16 @@ Code:
 }
 ```
 
-| Client | Where it goes | Key |
-| --- | --- | --- |
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | `mcpServers` |
-| Cursor | `~/.cursor/mcp.json` or `.cursor/mcp.json` | `mcpServers` (add `"type": "stdio"`) |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `mcpServers` |
-| Cline | `~/.cline/mcp.json` | `mcpServers` |
-| Roo Code | `.roo/mcp.json` | `mcpServers` |
-| VS Code (Copilot) | `.vscode/mcp.json` | `servers` + `"type": "stdio"` |
-| Zed | Zed `settings.json` | `context_servers` |
-| JetBrains | Settings → Tools → AI Assistant → MCP → Add → STDIO | paste the JSON above |
+| Client            | Where it goes                                                                                                                      | Key                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Claude Desktop    | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | `mcpServers`                         |
+| Cursor            | `~/.cursor/mcp.json` or `.cursor/mcp.json`                                                                                         | `mcpServers` (add `"type": "stdio"`) |
+| Windsurf          | `~/.codeium/windsurf/mcp_config.json`                                                                                              | `mcpServers`                         |
+| Cline             | `~/.cline/mcp.json`                                                                                                                | `mcpServers`                         |
+| Roo Code          | `.roo/mcp.json`                                                                                                                    | `mcpServers`                         |
+| VS Code (Copilot) | `.vscode/mcp.json`                                                                                                                 | `servers` + `"type": "stdio"`        |
+| Zed               | Zed `settings.json`                                                                                                                | `context_servers`                    |
+| JetBrains         | Settings → Tools → AI Assistant → MCP → Add → STDIO                                                                                | paste the JSON above                 |
 
 Use a text model: `openai/gpt-6-luna`, `anthropic/claude-opus-5.5`,
 `qwen/qwen3.8-max`. `txt models --vision` lists models that accept images.
@@ -112,60 +112,60 @@ gemini mcp add -e OPENAI_MODEL=openai/gpt-6-luna txt npx -y @dtst/txt
 
 One-shot writing: draft, summarise, rewrite, translate, extract.
 
-| param | type | what it does |
-| --- | --- | --- |
-| `instructions` | required, string | The task, e.g. `Summarise these release notes as 5 bullets for a non-technical reader`. Placed **last** in the prompt, which models follow best. |
-| `input` | string | Inline source material to transform (short texts). |
-| `context` | object | Reference material: `{ files, dirs, urls, text, artifacts }`. |
-| `context.files` | string[] | Paths, globs, `file://` URIs or `dtst://artifact/<id>`. |
-| `context.dirs` | string[] | Directories (non-recursive, capped at 64 files). |
-| `context.urls` | string[] | http(s) URLs returning text, JSON or an image. |
-| `context.text` | string[] | Inline snippets treated as context. |
-| `context.artifacts` | string[] | Artifacts from earlier calls. |
-| `images` | string[] ≤16 | Images for vision models: paths, globs, URLs, data URLs, base64, artifact URIs. |
-| `model` | string | One-off override of `OPENAI_MODEL`. |
-| `system` | string | Extra system guidance (persona, audience, constraints). |
-| `max_tokens` | int 1–200000 | Output budget. Raise it for reasoning models. |
-| `temperature` | number 0–2 | Sampling temperature. |
-| `top_p` | number 0–1 | Nucleus sampling. |
-| `stop` | string[] ≤4 | Stop sequences. |
-| `reasoning_effort` | string | `low`, `medium`, `high` for models that support it. |
-| `format` | `text` \| `markdown` \| `json` | `json` switches on JSON mode; the content is not validated for you. |
-| `verbosity` | `concise` \| `balanced` \| `detailed` | How much detail to produce. |
-| `stream` | boolean | Stream from the provider and report progress. Default `false` (most compatible). |
-| `output_path`, `output_dir`, `filename`, `overwrite`, `save` | | Saving controls (see below). Text is returned inline either way. |
+| param                                                        | type                                  | what it does                                                                                                                                     |
+| ------------------------------------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `instructions`                                               | required, string                      | The task, e.g. `Summarise these release notes as 5 bullets for a non-technical reader`. Placed **last** in the prompt, which models follow best. |
+| `input`                                                      | string                                | Inline source material to transform (short texts).                                                                                               |
+| `context`                                                    | object                                | Reference material: `{ files, dirs, urls, text, artifacts }`.                                                                                    |
+| `context.files`                                              | string[]                              | Paths, globs, `file://` URIs or `dtst://artifact/<id>`.                                                                                          |
+| `context.dirs`                                               | string[]                              | Directories (non-recursive, capped at 64 files).                                                                                                 |
+| `context.urls`                                               | string[]                              | http(s) URLs returning text, JSON or an image.                                                                                                   |
+| `context.text`                                               | string[]                              | Inline snippets treated as context.                                                                                                              |
+| `context.artifacts`                                          | string[]                              | Artifacts from earlier calls.                                                                                                                    |
+| `images`                                                     | string[] ≤16                          | Images for vision models: paths, globs, URLs, data URLs, base64, artifact URIs.                                                                  |
+| `model`                                                      | string                                | One-off override of `OPENAI_MODEL`.                                                                                                              |
+| `system`                                                     | string                                | Extra system guidance (persona, audience, constraints).                                                                                          |
+| `max_tokens`                                                 | int 1–200000                          | Output budget. Raise it for reasoning models.                                                                                                    |
+| `temperature`                                                | number 0–2                            | Sampling temperature.                                                                                                                            |
+| `top_p`                                                      | number 0–1                            | Nucleus sampling.                                                                                                                                |
+| `stop`                                                       | string[] ≤4                           | Stop sequences.                                                                                                                                  |
+| `reasoning_effort`                                           | string                                | `low`, `medium`, `high` for models that support it.                                                                                              |
+| `format`                                                     | `text` \| `markdown` \| `json`        | `json` switches on JSON mode; the content is not validated for you.                                                                              |
+| `verbosity`                                                  | `concise` \| `balanced` \| `detailed` | How much detail to produce.                                                                                                                      |
+| `stream`                                                     | boolean                               | Stream from the provider and report progress. Default `false` (most compatible).                                                                 |
+| `output_path`, `output_dir`, `filename`, `overwrite`, `save` |                                       | Saving controls (see below). Text is returned inline either way.                                                                                 |
 
 ### `chat`
 
 Multi-turn conversation; stateless, so send the whole history.
 
-| param | type | what it does |
-| --- | --- | --- |
-| `messages` | required, array | Oldest first: `[{ "role": "user" \| "assistant" \| "system", "content": "…" }]`. The last user turn is answered. |
-| `images` | string[] ≤16 | Attached to the **last user turn**. |
-| `model`, `system`, `max_tokens`, `temperature`, `top_p`, `stop`, `reasoning_effort`, `format`, `verbosity`, `stream` | | Same as `write_text`. |
-| `output_path`, `output_dir`, `filename`, `overwrite`, `save` | | Same saving controls. |
+| param                                                                                                                | type            | what it does                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `messages`                                                                                                           | required, array | Oldest first: `[{ "role": "user" \| "assistant" \| "system", "content": "…" }]`. The last user turn is answered. |
+| `images`                                                                                                             | string[] ≤16    | Attached to the **last user turn**.                                                                              |
+| `model`, `system`, `max_tokens`, `temperature`, `top_p`, `stop`, `reasoning_effort`, `format`, `verbosity`, `stream` |                 | Same as `write_text`.                                                                                            |
+| `output_path`, `output_dir`, `filename`, `overwrite`, `save`                                                         |                 | Same saving controls.                                                                                            |
 
 ### `read_context`
 
 Brings reference material into the conversation as text + image content.
 
-| param | type | what it does |
-| --- | --- | --- |
-| `files` | string[] | Paths, globs, `file://` URIs, artifact URIs. |
-| `dirs` | string[] | Directories (non-recursive, ≤64 files). |
-| `urls` | string[] | http(s) URLs returning text, JSON or an image. |
-| `text` | string[] | Inline snippets passed through. |
-| `images` | string[] ≤16 | Image sources to load as image content. |
+| param                  | type             | what it does                                                                  |
+| ---------------------- | ---------------- | ----------------------------------------------------------------------------- |
+| `files`                | string[]         | Paths, globs, `file://` URIs, artifact URIs.                                  |
+| `dirs`                 | string[]         | Directories (non-recursive, ≤64 files).                                       |
+| `urls`                 | string[]         | http(s) URLs returning text, JSON or an image.                                |
+| `text`                 | string[]         | Inline snippets passed through.                                               |
+| `images`               | string[] ≤16     | Image sources to load as image content.                                       |
 | `max_bytes_per_source` | int 1024–8388608 | Per-source budget (default 262144); longer files are truncated with a marker. |
-| `include_content` | boolean | `false` returns only sizes and paths. Default `true`. |
+| `include_content`      | boolean          | `false` returns only sizes and paths. Default `true`.                         |
 
 ### `list_models`
 
-| param | type | what it does |
-| --- | --- | --- |
-| `query` | string | Substring filter over model id and name. |
-| `limit` | int 1–1000 | Maximum results (default 100). |
+| param   | type       | what it does                             |
+| ------- | ---------- | ---------------------------------------- |
+| `query` | string     | Substring filter over model id and name. |
+| `limit` | int 1–1000 | Maximum results (default 100).           |
 
 ## How an agent uses it
 

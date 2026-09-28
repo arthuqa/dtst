@@ -103,7 +103,7 @@ export class ChatCompletionsClient implements CompletionClient {
       try {
         const { stream_options: _ignored, ...withoutUsage } = streamingBody;
         return await this.stream(withoutUsage, request, context);
-      } catch (streamError) {
+      } catch {
         context.log.warn("provider rejected streaming; falling back to a buffered request", {
           model: request.model,
         });
@@ -114,10 +114,9 @@ export class ChatCompletionsClient implements CompletionClient {
 
   /** Buffered chat completion; the body is built dynamically, hence the cast. */
   private async buffered(body: Record<string, unknown>, signal: AbortSignal): Promise<ChatCompletion> {
-    return (await this.client.chat.completions.create(
-      body as unknown as ChatCompletionCreateParamsNonStreaming,
-      { signal },
-    )) as ChatCompletion;
+    return (await this.client.chat.completions.create(body as unknown as ChatCompletionCreateParamsNonStreaming, {
+      signal,
+    })) as ChatCompletion;
   }
 
   private async stream(
@@ -253,7 +252,9 @@ export class ResponsesClient implements CompletionClient {
   }
 }
 
-function extractResponseText(response: { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }> }): string {
+function extractResponseText(response: {
+  output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+}): string {
   const parts: string[] = [];
   for (const item of response.output ?? []) {
     for (const content of item.content ?? []) {

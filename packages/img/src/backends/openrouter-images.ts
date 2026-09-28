@@ -9,13 +9,7 @@
  * data-URL entries) rather than multipart. There is no mask parameter.
  */
 
-import {
-  type LoadedImage,
-  DtstError,
-  extractErrorMessage,
-  requestJson,
-  toChatImagePart,
-} from "@dtst/internal";
+import { type LoadedImage, DtstError, extractErrorMessage, requestJson, toChatImagePart } from "@dtst/internal";
 import { buildPrompt } from "../prompt";
 import { ERROR_UNSUPPORTED } from "../errors";
 import { resolveImageModel } from "../model";
@@ -120,18 +114,25 @@ export class OpenRouterImagesBackend implements ImageBackend {
   }
 
   async listModels(context: BackendContext, filter: ModelFilter): Promise<ImageModelInfo[]> {
-    const response = await requestJson<{ data?: OpenRouterModelListEntry[] }>(`${context.config.baseUrl}/images/models`, {
-      signal: context.signal,
-      label: "GET /images/models",
-      maxRetries: 1,
-    });
+    const response = await requestJson<{ data?: OpenRouterModelListEntry[] }>(
+      `${context.config.baseUrl}/images/models`,
+      {
+        signal: context.signal,
+        label: "GET /images/models",
+        maxRetries: 1,
+      },
+    );
     const entries = response.json?.data ?? [];
     const models: ImageModelInfo[] = entries.map((entry) => ({
       id: entry.id ?? "unknown",
       ...(entry.name === undefined ? {} : { name: entry.name }),
       ...(entry.description === undefined ? {} : { description: entry.description }),
-      ...(entry.architecture?.input_modalities === undefined ? {} : { inputModalities: entry.architecture.input_modalities }),
-      ...(entry.architecture?.output_modalities === undefined ? {} : { outputModalities: entry.architecture.output_modalities }),
+      ...(entry.architecture?.input_modalities === undefined
+        ? {}
+        : { inputModalities: entry.architecture.input_modalities }),
+      ...(entry.architecture?.output_modalities === undefined
+        ? {}
+        : { outputModalities: entry.architecture.output_modalities }),
       ...(entry.supports_streaming === undefined ? {} : { supportsStreaming: entry.supports_streaming }),
       endpointCount: Array.isArray(entry.endpoints) ? entry.endpoints.length : 0,
       backend: this.kind,
@@ -183,7 +184,8 @@ export class OpenRouterImagesBackend implements ImageBackend {
         hint: "The model may not be available on the images API. Try DTST_IMG_BACKEND=chat, or check `list_image_models`.",
       });
     }
-    const fallbackMime = request.outputFormat === "jpeg" ? "image/jpeg" : request.outputFormat === "webp" ? "image/webp" : "image/png";
+    const fallbackMime =
+      request.outputFormat === "jpeg" ? "image/jpeg" : request.outputFormat === "webp" ? "image/webp" : "image/png";
     return Promise.all(
       entries.map(async (entry) => {
         const rendered = await renderedImageFrom(entry, { fallbackMime, signal: context.signal, log: context.log });

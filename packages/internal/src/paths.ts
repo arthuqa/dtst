@@ -53,6 +53,7 @@ export function stripTrailingSeparators(input: string): string {
 export function sanitizeFilename(input: string): string {
   const base = path.basename(input.trim());
   const cleaned = base
+    // oxlint-disable-next-line no-control-regex -- deliberately stripping control characters from filenames
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/[/\\:*?"<>|]/g, "-")
     .replace(/\s+/g, "-")

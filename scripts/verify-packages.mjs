@@ -70,7 +70,8 @@ for (const pkg of PACKAGES) {
   if (manifest.bin?.[pkg.bin] !== "dist/cli.js") {
     fail(pkg.name, `bin.${pkg.bin} must point at dist/cli.js (npx resolves the bin by the unscoped name)`);
   }
-  if (manifest.publishConfig?.access !== "public") fail(pkg.name, "publishConfig.access must be public for a scoped package");
+  if (manifest.publishConfig?.access !== "public")
+    fail(pkg.name, "publishConfig.access must be public for a scoped package");
   if (!manifest.engines?.node) fail(pkg.name, "engines.node must be declared (>=22.14)");
   if (!manifest.repository?.url?.includes("github.com/")) fail(pkg.name, "repository.url is required for provenance");
   if (!manifest.files?.includes("dist")) fail(pkg.name, "files must include dist");
@@ -84,7 +85,8 @@ for (const pkg of PACKAGES) {
   const bundle = readFileSync(path.join(dir, "dist", "cli.js"), "utf8");
   if (!bundle.startsWith("#!/usr/bin/env node")) fail(pkg.name, "dist/cli.js is missing its shebang");
   if (bundle.includes("@dtst/internal")) fail(pkg.name, "dist/cli.js still references the private workspace");
-  if (/from\s+["']\.\/[^"']+["']/.test(bundle)) fail(pkg.name, "dist/cli.js imports relative chunks (splitting must stay off)");
+  if (/from\s+["']\.\/[^"']+["']/.test(bundle))
+    fail(pkg.name, "dist/cli.js imports relative chunks (splitting must stay off)");
   const bundleKb = statSync(path.join(dir, "dist", "cli.js")).size / 1024;
   ok(`bundle self-contained (${bundleKb.toFixed(1)} KiB)`);
 
@@ -94,9 +96,12 @@ for (const pkg of PACKAGES) {
   for (const required of ["package.json", "dist/cli.js", "dist/index.js", "README.md"]) {
     if (!files.includes(required)) fail(pkg.name, `tarball is missing ${required}`);
   }
-  const leaked = files.filter((file) => /^(src|test)\//.test(file) || file.includes("node_modules") || file.endsWith(".test.ts"));
+  const leaked = files.filter(
+    (file) => /^(src|test)\//.test(file) || file.includes("node_modules") || file.endsWith(".test.ts"),
+  );
   if (leaked.length > 0) fail(pkg.name, `tarball leaks source/test files: ${leaked.slice(0, 5).join(", ")}`);
-  if (packed.unpackedSize > 4 * 1024 * 1024) fail(pkg.name, `unpacked size ${packed.unpackedSize} bytes is unexpectedly large`);
+  if (packed.unpackedSize > 4 * 1024 * 1024)
+    fail(pkg.name, `unpacked size ${packed.unpackedSize} bytes is unexpectedly large`);
   notes.push(`${pkg.name}: tarball ${files.length} files, ${(packed.size / 1024).toFixed(1)} KiB packed`);
   ok(`tarball contents (${files.length} files, ${(packed.size / 1024).toFixed(1)} KiB)`);
 
@@ -104,14 +109,18 @@ for (const pkg of PACKAGES) {
   if (skipInstall) continue;
   const workdir = mkdtempSync(path.join(os.tmpdir(), `dtst-${pkg.bin}-`));
   try {
-    const tarball = run("npm", ["pack", "--silent", "--pack-destination", workdir], { cwd: dir }).trim().split("\n").pop();
+    const tarball = run("npm", ["pack", "--silent", "--pack-destination", workdir], { cwd: dir })
+      .trim()
+      .split("\n")
+      .pop();
     const tarballPath = path.join(workdir, tarball);
     if (!existsSync(tarballPath)) {
       fail(pkg.name, `npm pack did not produce a tarball (got ${tarball})`);
       continue;
     }
     const version = run("npx", ["--yes", `--package=${tarballPath}`, pkg.bin, "--version"], { cwd: workdir });
-    if (!version.includes(manifest.version)) fail(pkg.name, `npx ${pkg.bin} --version printed ${JSON.stringify(version.trim())}`);
+    if (!version.includes(manifest.version))
+      fail(pkg.name, `npx ${pkg.bin} --version printed ${JSON.stringify(version.trim())}`);
     const help = run("npx", ["--yes", `--package=${tarballPath}`, pkg.bin, "--help"], { cwd: workdir });
     if (!help.includes("serve")) fail(pkg.name, "CLI --help does not mention the `serve` command");
     ok(`npx ${pkg.bin} runs from the packed tarball (v${manifest.version})`);

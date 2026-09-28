@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DtstError } from "@dtst/internal";
-import {
-  BASE_SYSTEM_PROMPT,
-  buildSystemPrompt,
-  buildUserPrompt,
-  extensionForFormat,
-  slugify,
-} from "../../src/prompt";
+import { BASE_SYSTEM_PROMPT, buildSystemPrompt, buildUserPrompt, extensionForFormat, slugify } from "../../src/prompt";
 
 describe("buildSystemPrompt", () => {
   it("includes the base rules and the untrusted-context warning", () => {

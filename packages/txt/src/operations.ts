@@ -29,7 +29,14 @@ import {
   type Usage,
   createCompletionClient,
 } from "./api/completions";
-import { buildSystemPrompt, buildUserPrompt, extensionForFormat, slugify, type OutputFormat, type Verbosity } from "./prompt";
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  extensionForFormat,
+  slugify,
+  type OutputFormat,
+  type Verbosity,
+} from "./prompt";
 
 export interface OperationContext {
   config: ProviderConfig;
@@ -141,7 +148,10 @@ export async function runWriteText(input: WriteTextInput, context: OperationCont
 }
 
 /** Surface dropped image inputs instead of silently ignoring them. */
-function appendSkippedImages(outcome: TextOutcome, skipped: readonly { source: string; reason: string }[]): TextOutcome {
+function appendSkippedImages(
+  outcome: TextOutcome,
+  skipped: readonly { source: string; reason: string }[],
+): TextOutcome {
   if (skipped.length === 0) return outcome;
   const summary = skipped.map((entry) => `${entry.source} (${entry.reason})`).join("; ");
   outcome.content.push(text(`Skipped ${skipped.length} image(s): ${summary}`));
@@ -165,7 +175,12 @@ export async function runChat(input: ChatInput, context: OperationContext): Prom
     artifacts: context.artifacts,
   });
 
-  const system = buildSystemPrompt({ system: input.system, verbosity: input.verbosity, format: input.format, toolName: "chat" });
+  const system = buildSystemPrompt({
+    system: input.system,
+    verbosity: input.verbosity,
+    format: input.format,
+    toolName: "chat",
+  });
   const messages: ChatMessage[] = [{ role: "system", text: system }];
   const lastUserIndex = findLastUserIndex(input.messages);
   for (const [index, message] of input.messages.entries()) {
@@ -178,7 +193,12 @@ export async function runChat(input: ChatInput, context: OperationContext): Prom
   }
 
   const result = await execute(messages, input, model, context);
-  const outcome = await persistAndDescribe(result, { ...input, save: input.save ?? hasExplicitDestination(input) }, context, started);
+  const outcome = await persistAndDescribe(
+    result,
+    { ...input, save: input.save ?? hasExplicitDestination(input) },
+    context,
+    started,
+  );
   return appendSkippedImages(outcome, skipped);
 }
 
@@ -268,7 +288,8 @@ async function persistAndDescribe(
     });
     content.push(...blocks);
     const artifactBlock = blocks.find((block) => block.type === "text" && block.text.includes("Artifact:"));
-    const artifactUri = artifactBlock && artifactBlock.type === "text" ? /Artifact: (\S+)/.exec(artifactBlock.text)?.[1] : undefined;
+    const artifactUri =
+      artifactBlock && artifactBlock.type === "text" ? /Artifact: (\S+)/.exec(artifactBlock.text)?.[1] : undefined;
     saved = { path: written.path, bytes: written.bytes, ...(artifactUri === undefined ? {} : { artifactUri }) };
     summary = `Wrote ${written.bytes} bytes to ${written.path}`;
   }

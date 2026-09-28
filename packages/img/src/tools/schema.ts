@@ -58,7 +58,11 @@ export const outputCompressionField = z
   .optional()
   .describe("Compression level for jpeg/webp output (0-100).");
 
-export const seedField = z.number().int().optional().describe("Seed for reproducible results, when the provider supports it.");
+export const seedField = z
+  .number()
+  .int()
+  .optional()
+  .describe("Seed for reproducible results, when the provider supports it.");
 
 export const styleField = z
   .string()
@@ -83,7 +87,10 @@ export const outputFields = {
     .boolean()
     .optional()
     .describe("Replace an existing file instead of appending -1, -2, ... to the name. Defaults to false."),
-  save: z.boolean().optional().describe("Write the image(s) to disk. Defaults to true; set false for a preview-only call."),
+  save: z
+    .boolean()
+    .optional()
+    .describe("Write the image(s) to disk. Defaults to true; set false for a preview-only call."),
   inline: z
     .boolean()
     .optional()

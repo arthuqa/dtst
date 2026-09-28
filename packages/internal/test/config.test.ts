@@ -1,13 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_MAX_IMAGES,
-  DtstError,
-  configSummary,
-  normalizeBaseUrl,
-  redact,
-  resolveConfig,
-} from "@dtst/internal";
+import { DEFAULT_MAX_IMAGES, DtstError, configSummary, normalizeBaseUrl, redact, resolveConfig } from "@dtst/internal";
 import { catchDtstError } from "./helpers";
 
 const base = {
@@ -154,8 +147,12 @@ describe("resolveConfig: mapping of optional variables", () => {
 
   it("rejects malformed DTST_EXTRA_BODY and DTST_EXTRA_HEADERS", () => {
     expect(catchDtstError(() => resolveConfig({ env: { ...base, DTST_EXTRA_BODY: "{" } })).code).toBe("CONFIG_INVALID");
-    expect(catchDtstError(() => resolveConfig({ env: { ...base, DTST_EXTRA_BODY: "[1]" } })).code).toBe("CONFIG_INVALID");
-    expect(catchDtstError(() => resolveConfig({ env: { ...base, DTST_EXTRA_HEADERS: "nope" } })).code).toBe("CONFIG_INVALID");
+    expect(catchDtstError(() => resolveConfig({ env: { ...base, DTST_EXTRA_BODY: "[1]" } })).code).toBe(
+      "CONFIG_INVALID",
+    );
+    expect(catchDtstError(() => resolveConfig({ env: { ...base, DTST_EXTRA_HEADERS: "nope" } })).code).toBe(
+      "CONFIG_INVALID",
+    );
   });
 });
 

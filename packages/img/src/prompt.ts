@@ -24,7 +24,10 @@ export function buildPrompt(parts: PromptParts): string {
 export function normalizePrompt(prompt: string): string {
   const trimmed = prompt.trim();
   if (!trimmed) {
-    throw badInput("`prompt` must not be empty.", "Describe the image you want, e.g. \"a red panda astronaut, studio light\".");
+    throw badInput(
+      "`prompt` must not be empty.",
+      'Describe the image you want, e.g. "a red panda astronaut, studio light".',
+    );
   }
   if (trimmed.length > MAX_PROMPT_CHARS) {
     throw badInput(`\`prompt\` is ${trimmed.length} characters; the maximum is ${MAX_PROMPT_CHARS}.`);
@@ -33,8 +36,32 @@ export function normalizePrompt(prompt: string): string {
 }
 
 const STOP_WORDS = new Set([
-  "a", "an", "the", "of", "in", "on", "at", "with", "and", "or", "for", "to", "from", "by", "into", "over",
-  "ultra", "very", "highly", "detailed", "photo", "photograph", "image", "picture", "render", "realistic",
+  "a",
+  "an",
+  "the",
+  "of",
+  "in",
+  "on",
+  "at",
+  "with",
+  "and",
+  "or",
+  "for",
+  "to",
+  "from",
+  "by",
+  "into",
+  "over",
+  "ultra",
+  "very",
+  "highly",
+  "detailed",
+  "photo",
+  "photograph",
+  "image",
+  "picture",
+  "render",
+  "realistic",
 ]);
 
 /** Deterministic, filesystem-safe file name derived from the prompt. */

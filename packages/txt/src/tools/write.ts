@@ -14,7 +14,9 @@ export const writeTextSchema = z.object({
   input: z
     .string()
     .optional()
-    .describe("Inline source material to rewrite, translate, summarise or fix. Alternative to `context` for short texts."),
+    .describe(
+      "Inline source material to rewrite, translate, summarise or fix. Alternative to `context` for short texts.",
+    ),
   context: z
     .object({
       files: z.array(z.string()).optional().describe("File paths, globs, file:// URIs or artifact URIs."),
@@ -56,10 +58,7 @@ export function registerWriteTextTool(server: ServerLike, runtime: ToolRuntime):
     async (input, context) => {
       const outcome = await runWriteText(input, runtime.operationContext(context));
       context.log.debug("write_text finished", { chars: outcome.text.length, model: outcome.model });
-      return ok([
-        ...outcome.content,
-        text(textOutcomeSummary(outcome)),
-      ], outcome.structured);
+      return ok([...outcome.content, text(textOutcomeSummary(outcome))], outcome.structured);
     },
   );
 }

@@ -5,12 +5,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  type LoadedImage,
-  type Logger,
-  type ProgressReporter,
-  type ProviderConfig,
-} from "@dtst/internal";
+import { type LoadedImage, type Logger, type ProgressReporter, type ProviderConfig } from "@dtst/internal";
 
 export function be32(value: number): Buffer {
   const buffer = Buffer.alloc(4);
@@ -67,7 +62,11 @@ export function recordingProgress(): ProgressReporter & { calls: ProgressCall[] 
     enabled: true,
     calls,
     async report(progress, total, message) {
-      calls.push({ progress, ...(total === undefined ? {} : { total }), ...(message === undefined ? {} : { message }) });
+      calls.push({
+        progress,
+        ...(total === undefined ? {} : { total }),
+        ...(message === undefined ? {} : { message }),
+      });
     },
     async done(message) {
       calls.push({ progress: 1, ...(message === undefined ? {} : { message }) });

@@ -220,7 +220,13 @@ describe("ResponsesClient", () => {
     const create = vi.fn().mockResolvedValue({
       model: "r2",
       output: [
-        { type: "message", content: [{ type: "output_text", text: "Hello " }, { type: "output_text", text: "world" }] },
+        {
+          type: "message",
+          content: [
+            { type: "output_text", text: "Hello " },
+            { type: "output_text", text: "world" },
+          ],
+        },
       ],
     });
     const client = new ResponsesClient(fakeResponsesClient(create));
@@ -246,7 +252,13 @@ describe("ResponsesClient", () => {
     const client = new ResponsesClient(fakeResponsesClient(create));
 
     await client.complete(
-      { model: "m1", messages: [{ role: "user", text: "hi" }], maxTokens: 128, reasoningEffort: "high", jsonMode: true },
+      {
+        model: "m1",
+        messages: [{ role: "user", text: "hi" }],
+        maxTokens: 128,
+        reasoningEffort: "high",
+        jsonMode: true,
+      },
       context(false),
     );
 

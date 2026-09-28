@@ -43,16 +43,16 @@ Code:
 }
 ```
 
-| Client | Where it goes | Key |
-| --- | --- | --- |
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | `mcpServers` |
-| Cursor | `~/.cursor/mcp.json` or `.cursor/mcp.json` | `mcpServers` (add `"type": "stdio"`) |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `mcpServers` |
-| Cline | `~/.cline/mcp.json` | `mcpServers` |
-| Roo Code | `.roo/mcp.json` | `mcpServers` |
-| VS Code (Copilot) | `.vscode/mcp.json` | `servers` + `"type": "stdio"` |
-| Zed | Zed `settings.json` | `context_servers` |
-| JetBrains | Settings → Tools → AI Assistant → MCP → Add → STDIO | paste the JSON above |
+| Client            | Where it goes                                                                                                                      | Key                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Claude Desktop    | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | `mcpServers`                         |
+| Cursor            | `~/.cursor/mcp.json` or `.cursor/mcp.json`                                                                                         | `mcpServers` (add `"type": "stdio"`) |
+| Windsurf          | `~/.codeium/windsurf/mcp_config.json`                                                                                              | `mcpServers`                         |
+| Cline             | `~/.cline/mcp.json`                                                                                                                | `mcpServers`                         |
+| Roo Code          | `.roo/mcp.json`                                                                                                                    | `mcpServers`                         |
+| VS Code (Copilot) | `.vscode/mcp.json`                                                                                                                 | `servers` + `"type": "stdio"`        |
+| Zed               | Zed `settings.json`                                                                                                                | `context_servers`                    |
+| JetBrains         | Settings → Tools → AI Assistant → MCP → Add → STDIO                                                                                | paste the JSON above                 |
 
 Use an image model: `meta/muse-image`, `google/gemini-3.1-flash-image`,
 `openai/gpt-image-1`, `dall-e-3`. `img models` lists what your endpoint offers.
@@ -110,45 +110,45 @@ gemini mcp add -e OPENAI_MODEL=meta/muse-image img npx -y @dtst/img
 
 ### `generate_image`
 
-| param | type | what it does |
-| --- | --- | --- |
-| `prompt` | required, string | What to draw — subject, composition, lighting, medium. Up to 30,000 chars. |
-| `model` | string | One-off override of `OPENAI_MODEL`. |
-| `n` | int 1–10 | How many images. Default 1. |
-| `size` | string | Explicit pixels (`1024x1024`, `1536x1024`, any `WxH` the provider allows) or a tier (`1K`, `2K`, `4K`, `auto`). |
-| `aspect_ratio` | string | For providers taking a ratio instead of pixels: `16:9`, `1:1`, `4:5`, `auto`, … |
-| `quality` | string | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (DALL·E also `standard`, `hd`). |
-| `output_format` | `png` \| `jpeg` \| `webp` | Encoding of the saved file. |
-| `background` | `transparent` \| `opaque` \| `auto` | `transparent` needs png/webp. |
-| `output_compression` | int 0–100 | Compression for jpeg/webp. |
-| `seed` | int | Reproducible results where the provider supports it. |
-| `style` | string | Style guidance appended to the prompt, e.g. `watercolour, 35mm`. |
-| `negative_prompt` | string | Things to avoid. |
-| `output_path` | string | Exact file **or** directory to write to. Wins over `output_dir`. |
-| `output_dir` | string | Directory to write into. |
-| `filename` | string | Preferred name; the extension follows the returned image type. |
-| `overwrite` | boolean | `false` (default) appends `-1`, `-2`, … instead of clobbering. |
-| `save` | boolean | `false` = generate without touching the disk. Default `true`. |
-| `inline` | boolean | `false` = skip the base64 preview in the response. Default `true`. |
+| param                | type                                | what it does                                                                                                    |
+| -------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `prompt`             | required, string                    | What to draw — subject, composition, lighting, medium. Up to 30,000 chars.                                      |
+| `model`              | string                              | One-off override of `OPENAI_MODEL`.                                                                             |
+| `n`                  | int 1–10                            | How many images. Default 1.                                                                                     |
+| `size`               | string                              | Explicit pixels (`1024x1024`, `1536x1024`, any `WxH` the provider allows) or a tier (`1K`, `2K`, `4K`, `auto`). |
+| `aspect_ratio`       | string                              | For providers taking a ratio instead of pixels: `16:9`, `1:1`, `4:5`, `auto`, …                                 |
+| `quality`            | string                              | `low`, `medium`, `high`, `xhigh`, `max`, `auto` (DALL·E also `standard`, `hd`).                                 |
+| `output_format`      | `png` \| `jpeg` \| `webp`           | Encoding of the saved file.                                                                                     |
+| `background`         | `transparent` \| `opaque` \| `auto` | `transparent` needs png/webp.                                                                                   |
+| `output_compression` | int 0–100                           | Compression for jpeg/webp.                                                                                      |
+| `seed`               | int                                 | Reproducible results where the provider supports it.                                                            |
+| `style`              | string                              | Style guidance appended to the prompt, e.g. `watercolour, 35mm`.                                                |
+| `negative_prompt`    | string                              | Things to avoid.                                                                                                |
+| `output_path`        | string                              | Exact file **or** directory to write to. Wins over `output_dir`.                                                |
+| `output_dir`         | string                              | Directory to write into.                                                                                        |
+| `filename`           | string                              | Preferred name; the extension follows the returned image type.                                                  |
+| `overwrite`          | boolean                             | `false` (default) appends `-1`, `-2`, … instead of clobbering.                                                  |
+| `save`               | boolean                             | `false` = generate without touching the disk. Default `true`.                                                   |
+| `inline`             | boolean                             | `false` = skip the base64 preview in the response. Default `true`.                                              |
 
 ### `edit_image`
 
-| param | type | what it does |
-| --- | --- | --- |
-| `prompt` | required, string | The change to apply. |
-| `images` | required, string[] 1–16 | Inputs: file paths, globs (`assets/*.png`), http(s) URLs, `data:` URLs, raw base64, or `dtst://artifact/<id>` from an earlier call. |
-| `mask` | string | Mask image; transparent pixels mark the region to regenerate. OpenAI images-API backends only. |
-| `input_fidelity` | `high` \| `low` | How strongly to preserve input details (gpt-image models). |
-| `model`, `n`, `size`, `aspect_ratio`, `quality`, `output_format`, `background`, `output_compression`, `seed`, `style`, `negative_prompt` | | Same as `generate_image`. |
-| `output_path`, `output_dir`, `filename`, `overwrite`, `save`, `inline` | | Same saving controls. |
+| param                                                                                                                                    | type                    | what it does                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt`                                                                                                                                 | required, string        | The change to apply.                                                                                                                |
+| `images`                                                                                                                                 | required, string[] 1–16 | Inputs: file paths, globs (`assets/*.png`), http(s) URLs, `data:` URLs, raw base64, or `dtst://artifact/<id>` from an earlier call. |
+| `mask`                                                                                                                                   | string                  | Mask image; transparent pixels mark the region to regenerate. OpenAI images-API backends only.                                      |
+| `input_fidelity`                                                                                                                         | `high` \| `low`         | How strongly to preserve input details (gpt-image models).                                                                          |
+| `model`, `n`, `size`, `aspect_ratio`, `quality`, `output_format`, `background`, `output_compression`, `seed`, `style`, `negative_prompt` |                         | Same as `generate_image`.                                                                                                           |
+| `output_path`, `output_dir`, `filename`, `overwrite`, `save`, `inline`                                                                   |                         | Same saving controls.                                                                                                               |
 
 ### `list_image_models`
 
-| param | type | what it does |
-| --- | --- | --- |
-| `query` | string | Substring filter over model id, name and description. |
-| `limit` | int 1–500 | Maximum results (default 50). |
-| `output_modalities` | `image` \| `any` | `image` (default) lists models that emit images. |
+| param               | type             | what it does                                          |
+| ------------------- | ---------------- | ----------------------------------------------------- |
+| `query`             | string           | Substring filter over model id, name and description. |
+| `limit`             | int 1–500        | Maximum results (default 50).                         |
+| `output_modalities` | `image` \| `any` | `image` (default) lists models that emit images.      |
 
 ## How an agent uses it
 

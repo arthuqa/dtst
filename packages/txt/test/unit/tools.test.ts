@@ -68,7 +68,10 @@ describe("tool schemas", () => {
 
   it("write_text rejects bad inputs", () => {
     expect(writeTextSchema.safeParse({ instructions: "" }).success).toBe(false);
-    expect(writeTextSchema.safeParse({ instructions: "x", images: Array.from({ length: 17 }, (_, i) => `i-${i}.png`) }).success).toBe(false);
+    expect(
+      writeTextSchema.safeParse({ instructions: "x", images: Array.from({ length: 17 }, (_, i) => `i-${i}.png`) })
+        .success,
+    ).toBe(false);
     expect(writeTextSchema.safeParse({ instructions: "x", max_tokens: 0 }).success).toBe(false);
     expect(writeTextSchema.safeParse({ instructions: "x", temperature: 5 }).success).toBe(false);
     expect(writeTextSchema.safeParse({ instructions: "x", format: "yaml" }).success).toBe(false);
@@ -78,7 +81,12 @@ describe("tool schemas", () => {
     expect(chatSchema.safeParse({ messages: [{ role: "user", content: "hi" }] }).success).toBe(true);
     expect(chatSchema.safeParse({ messages: [] }).success).toBe(false);
     expect(chatSchema.safeParse({ messages: [{ role: "tool", content: "hi" }] }).success).toBe(false);
-    expect(chatSchema.safeParse({ messages: [{ role: "user", content: "hi" }], images: Array.from({ length: 17 }, (_, i) => `i-${i}.png`) }).success).toBe(false);
+    expect(
+      chatSchema.safeParse({
+        messages: [{ role: "user", content: "hi" }],
+        images: Array.from({ length: 17 }, (_, i) => `i-${i}.png`),
+      }).success,
+    ).toBe(false);
   });
 
   it("read_context validates budgets and flags", () => {

@@ -168,7 +168,9 @@ export function isEndpointUnsupported(error: unknown): boolean {
   // OpenRouter is explicit when a model belongs to the other route:
   // "<model> cannot be used with the chat/completions endpoint. Use the
   //  /api/v1/images endpoint instead."
-  if (/cannot be used with|use the \S*images endpoint instead|use the .*chat\/completions endpoint instead/i.test(message)) {
+  if (
+    /cannot be used with|use the \S*images endpoint instead|use the .*chat\/completions endpoint instead/i.test(message)
+  ) {
     return true;
   }
   if (error.status === 404 || error.status === 405 || error.status === 501) return true;
@@ -184,7 +186,12 @@ export async function listImageModels(
   filter: ModelFilter,
   context: { log: Logger; signal: AbortSignal; progress: BackendContext["progress"] },
 ): Promise<{ models: ImageModelInfo[]; backend: string; note?: string }> {
-  const backendContext: BackendContext = { config, log: context.log, progress: context.progress, signal: context.signal };
+  const backendContext: BackendContext = {
+    config,
+    log: context.log,
+    progress: context.progress,
+    signal: context.signal,
+  };
 
   if (config.imageBackend === "auto" && isOpenRouter(config)) {
     const models = new Map<string, ImageModelInfo>();
@@ -202,7 +209,12 @@ export async function listImageModels(
 
     // Image-output models reachable through chat completions.
     try {
-      const chatContext: BackendContext = { config, log: context.log, progress: context.progress, signal: context.signal };
+      const chatContext: BackendContext = {
+        config,
+        log: context.log,
+        progress: context.progress,
+        signal: context.signal,
+      };
       const chat = new ChatModalitiesBackend(createOpenAIClient(config));
       const chatModels = await listOpenRouterChatImageModels(config, chatContext);
       for (const model of chatModels) {
@@ -230,7 +242,11 @@ export async function listImageModels(
       : { models: [], backend: "openrouter", ...(note === undefined ? {} : { note }) };
   }
 
-  const selection = await resolveBackend(config, { log: context.log, ...(filter.query ? { model: filter.query } : {}) }, context.signal);
+  const selection = await resolveBackend(
+    config,
+    { log: context.log, ...(filter.query ? { model: filter.query } : {}) },
+    context.signal,
+  );
   const backend = selection.backend;
   if (!backend.listModels) {
     throw new DtstError("PROVIDER_UNSUPPORTED", `The ${backend.kind} backend cannot list models.`);
@@ -240,7 +256,10 @@ export async function listImageModels(
 }
 
 /** `GET /models?output_modalities=image` — image-output models on OpenRouter. */
-async function listOpenRouterChatImageModels(config: ProviderConfig, context: BackendContext): Promise<ImageModelInfo[]> {
+async function listOpenRouterChatImageModels(
+  config: ProviderConfig,
+  context: BackendContext,
+): Promise<ImageModelInfo[]> {
   const response = await requestJson<{
     data?: Array<{
       id?: string;
@@ -262,7 +281,9 @@ async function listOpenRouterChatImageModels(config: ProviderConfig, context: Ba
       ...(model.name === undefined ? {} : { name: model.name }),
       ...(model.description === undefined ? {} : { description: model.description }),
       outputModalities: model.architecture?.output_modalities ?? ["image"],
-      ...(model.architecture?.input_modalities === undefined ? {} : { inputModalities: model.architecture.input_modalities }),
+      ...(model.architecture?.input_modalities === undefined
+        ? {}
+        : { inputModalities: model.architecture.input_modalities }),
     }));
 }
 

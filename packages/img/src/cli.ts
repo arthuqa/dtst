@@ -104,7 +104,10 @@ function pick<T extends string>(values: CliValues, key: string, allowed: readonl
   return allowed.includes(value as T) ? (value as T) : undefined;
 }
 
-type OutputFields = Pick<GenerateOperationInput, "output_path" | "output_dir" | "filename" | "overwrite" | "save" | "inline">;
+type OutputFields = Pick<
+  GenerateOperationInput,
+  "output_path" | "output_dir" | "filename" | "overwrite" | "save" | "inline"
+>;
 
 function outputFields(values: CliValues): OutputFields {
   const out = stringValue(values, "out");
@@ -150,23 +153,68 @@ function generationFields(values: CliValues): Omit<GenerateOperationInput, "prom
 }
 
 const SHARED_OPTIONS = [
-  { name: "model", alias: "m", type: "string" as const, description: "Image model for this call (default: OPENAI_MODEL).", placeholder: "model" },
+  {
+    name: "model",
+    alias: "m",
+    type: "string" as const,
+    description: "Image model for this call (default: OPENAI_MODEL).",
+    placeholder: "model",
+  },
   { name: "n", type: "number" as const, description: "How many images to produce (1-10).", placeholder: "count" },
-  { name: "size", type: "string" as const, description: 'Explicit size ("1024x1024") or an OpenRouter tier ("2K").', placeholder: "size" },
+  {
+    name: "size",
+    type: "string" as const,
+    description: 'Explicit size ("1024x1024") or an OpenRouter tier ("2K").',
+    placeholder: "size",
+  },
   { name: "aspect-ratio", type: "string" as const, description: 'Aspect ratio such as "16:9".', placeholder: "ratio" },
-  { name: "resolution", type: "string" as const, description: "Resolution tier where the provider takes one.", placeholder: "tier" },
+  {
+    name: "resolution",
+    type: "string" as const,
+    description: "Resolution tier where the provider takes one.",
+    placeholder: "tier",
+  },
   { name: "quality", type: "string" as const, description: "low|medium|high|xhigh|max|auto.", placeholder: "quality" },
   { name: "format", type: "string" as const, description: "png|jpeg|webp.", placeholder: "format" },
   { name: "background", type: "string" as const, description: "transparent|opaque|auto.", placeholder: "mode" },
-  { name: "compression", type: "number" as const, description: "0-100 output compression for jpeg/webp.", placeholder: "0-100" },
-  { name: "seed", type: "number" as const, description: "Seed for reproducible output (provider permitting).", placeholder: "seed" },
-  { name: "style", type: "string" as const, description: "Style guidance appended to the prompt.", placeholder: "style" },
+  {
+    name: "compression",
+    type: "number" as const,
+    description: "0-100 output compression for jpeg/webp.",
+    placeholder: "0-100",
+  },
+  {
+    name: "seed",
+    type: "number" as const,
+    description: "Seed for reproducible output (provider permitting).",
+    placeholder: "seed",
+  },
+  {
+    name: "style",
+    type: "string" as const,
+    description: "Style guidance appended to the prompt.",
+    placeholder: "style",
+  },
   { name: "negative-prompt", type: "string" as const, description: "Things to avoid.", placeholder: "text" },
-  { name: "user", type: "string" as const, description: "Opaque end-user identifier forwarded to the provider.", placeholder: "id" },
+  {
+    name: "user",
+    type: "string" as const,
+    description: "Opaque end-user identifier forwarded to the provider.",
+    placeholder: "id",
+  },
   { name: "out", type: "string" as const, description: "Exact file or directory to write to.", placeholder: "path" },
   { name: "out-dir", type: "string" as const, description: "Directory to write into.", placeholder: "dir" },
-  { name: "filename", type: "string" as const, description: "Preferred file name (extension added automatically).", placeholder: "name" },
-  { name: "overwrite", type: "boolean" as const, description: "Replace an existing file instead of adding -1, -2 suffixes." },
+  {
+    name: "filename",
+    type: "string" as const,
+    description: "Preferred file name (extension added automatically).",
+    placeholder: "name",
+  },
+  {
+    name: "overwrite",
+    type: "boolean" as const,
+    description: "Replace an existing file instead of adding -1, -2 suffixes.",
+  },
   { name: "no-save", type: "boolean" as const, description: "Do not write to disk (prints the summary instead)." },
   { name: "no-inline", type: "boolean" as const, description: "Skip base64 previews in --json output." },
 ] as const;
@@ -210,7 +258,12 @@ const editCommand: CliCommandSpec = {
       placeholder: "source",
     },
     { name: "mask", type: "string", description: "Mask image (images/edit backends only).", placeholder: "path" },
-    { name: "input-fidelity", type: "string", description: "high|low — how strongly to preserve the input.", placeholder: "fidelity" },
+    {
+      name: "input-fidelity",
+      type: "string",
+      description: "high|low — how strongly to preserve the input.",
+      placeholder: "fidelity",
+    },
     ...SHARED_OPTIONS,
   ],
   examples: [
@@ -244,9 +297,20 @@ const modelsCommand: CliCommandSpec = {
   name: "models",
   summary: "List the image models the configured endpoint offers.",
   options: [
-    { name: "query", alias: "q", type: "string", description: "Substring filter over model id, name or description.", placeholder: "text" },
+    {
+      name: "query",
+      alias: "q",
+      type: "string",
+      description: "Substring filter over model id, name or description.",
+      placeholder: "text",
+    },
     { name: "limit", type: "number", description: "Maximum results (default 50).", placeholder: "count" },
-    { name: "backend", type: "string", description: "Force a protocol: auto|images|openrouter|chat.", placeholder: "kind" },
+    {
+      name: "backend",
+      type: "string",
+      description: "Force a protocol: auto|images|openrouter|chat.",
+      placeholder: "kind",
+    },
   ],
   examples: ["img models --query gemini --limit 20", "img models --json"],
   async run({ values, out, json, log }) {
@@ -261,7 +325,12 @@ const modelsCommand: CliCommandSpec = {
     if (json) {
       out(
         JSON.stringify(
-          { ok: true, backend: result.backend, ...(result.note === undefined ? {} : { note: result.note }), models: result.models },
+          {
+            ok: true,
+            backend: result.backend,
+            ...(result.note === undefined ? {} : { note: result.note }),
+            models: result.models,
+          },
           null,
           2,
         ),
@@ -309,26 +378,48 @@ await runCli({
     await runImgServer({ log });
   },
   env: [
-    { name: "OPENAI_BASE_URL", description: "API root of any OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1", required: true },
-    { name: "OPENAI_API_KEY", description: "Bearer token. Optional for localhost endpoints unless DTST_ALLOW_NO_API_KEY=0.", required: true },
+    {
+      name: "OPENAI_BASE_URL",
+      description: "API root of any OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1",
+      required: true,
+    },
+    {
+      name: "OPENAI_API_KEY",
+      description: "Bearer token. Optional for localhost endpoints unless DTST_ALLOW_NO_API_KEY=0.",
+      required: true,
+    },
     { name: "OPENAI_MODEL", description: "The image model this server uses.", required: true },
     { name: "DTST_IMG_BACKEND", description: "auto (default) | images | openrouter | chat — force a wire protocol." },
     { name: "DTST_WORKSPACE", description: "Root for relative output paths (default: process cwd)." },
     { name: "DTST_OUTPUT_DIR", description: "Default directory for generated files." },
-    { name: "DTST_ALLOWED_WRITE_ROOTS", description: "Colon-separated allow-list; when set, writes outside it are refused." },
+    {
+      name: "DTST_ALLOWED_WRITE_ROOTS",
+      description: "Colon-separated allow-list; when set, writes outside it are refused.",
+    },
     { name: "DTST_TIMEOUT_MS", description: "Per-request timeout in ms (default 600000)." },
     { name: "DTST_MAX_RETRIES", description: "Retries for 408/409/429/5xx (default 2)." },
     { name: "DTST_EXTRA_HEADERS", description: "JSON object merged into every request (provider knobs)." },
     { name: "DTST_EXTRA_BODY", description: "JSON object merged into every request body." },
     { name: "DTST_LOG_LEVEL", description: "silent | error | warn | info | debug (default warn). stderr only." },
-    { name: "DEBUG", description: 'Set to "true" for verbose diagnostics on stderr (shorthand for DTST_LOG_LEVEL=debug).' },
+    {
+      name: "DEBUG",
+      description: 'Set to "true" for verbose diagnostics on stderr (shorthand for DTST_LOG_LEVEL=debug).',
+    },
     { name: "DTST_ENV_FILE", description: "Explicit .env file to load instead of walking up from cwd." },
   ],
   defaults: [
     { name: "backend", value: "auto", description: "Chooses images / openrouter / chat from the host and model." },
     { name: "n", value: "1", description: "Images per call." },
-    { name: "inline", value: "true", description: "Include image bytes in the MCP response (budget: 4 images / 8 MiB)." },
-    { name: "overwrite", value: "false", description: "Existing files get a -1, -2, … suffix instead of being replaced." },
+    {
+      name: "inline",
+      value: "true",
+      description: "Include image bytes in the MCP response (budget: 4 images / 8 MiB).",
+    },
+    {
+      name: "overwrite",
+      value: "false",
+      description: "Existing files get a -1, -2, … suffix instead of being replaced.",
+    },
   ],
 });
 

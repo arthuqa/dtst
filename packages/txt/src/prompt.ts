@@ -40,7 +40,8 @@ const VERBOSITY_RULES: Record<Verbosity, string> = {
 export function buildSystemPrompt(input: SystemPromptInput = {}): string {
   const parts: string[] = [BASE_SYSTEM_PROMPT];
   if (input.verbosity) parts.push(VERBOSITY_RULES[input.verbosity]);
-  if (input.format === "markdown") parts.push("Format the answer as clean Markdown. Do not wrap the whole answer in a code fence.");
+  if (input.format === "markdown")
+    parts.push("Format the answer as clean Markdown. Do not wrap the whole answer in a code fence.");
   if (input.format === "json") {
     parts.push(
       "Return a single valid JSON value and nothing else: no prose, no explanations and no Markdown code fences.",
@@ -55,7 +56,8 @@ export interface UserPromptInput {
   instructions: string;
   input?: string | undefined;
   context?: Pick<ContextResult, "chunks"> | undefined;
-  images?: readonly { label: string; mimeType: string; width?: number | undefined; height?: number | undefined }[] | undefined;
+  images?:
+    readonly { label: string; mimeType: string; width?: number | undefined; height?: number | undefined }[] | undefined;
   /** Extra labelled sections, e.g. conversation history. */
   sections?: readonly { title: string; body: string }[] | undefined;
 }
@@ -63,7 +65,10 @@ export interface UserPromptInput {
 export function buildUserPrompt(input: UserPromptInput): string {
   const instructions = input.instructions.trim();
   if (!instructions) {
-    throw badInput("`instructions` must not be empty.", "Describe the writing task, e.g. \"Summarise the release notes in 5 bullets\".");
+    throw badInput(
+      "`instructions` must not be empty.",
+      'Describe the writing task, e.g. "Summarise the release notes in 5 bullets".',
+    );
   }
 
   const parts: string[] = [];

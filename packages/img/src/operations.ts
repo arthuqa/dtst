@@ -116,7 +116,8 @@ export async function runGenerate(input: GenerateOperationInput, context: Operat
 export async function runEdit(input: EditOperationInput, context: OperationContext): Promise<OperationOutcome> {
   const model = resolveImageModel(context.config, input.model);
   const selection = await resolveBackend(context.config, { model, log: context.log }, context.signal);
-  if (!selection.backend.capabilities.edit || !selection.backend.edit) throw imgErrors.editUnsupported(selection.backend.kind);
+  if (!selection.backend.capabilities.edit || !selection.backend.edit)
+    throw imgErrors.editUnsupported(selection.backend.kind);
   if (input.mask && !selection.backend.capabilities.mask) throw imgErrors.maskUnsupported(selection.backend.kind);
 
   const { images, skipped } = await loadImages(input.images, {
@@ -129,7 +130,14 @@ export async function runEdit(input: EditOperationInput, context: OperationConte
   if (images.length === 0) throw imgErrors.needsInputImages();
 
   const mask = input.mask
-    ? (await loadImages([input.mask], { root: context.config.workspaceRoot, maxBytes: context.config.maxImageBytes, signal: context.signal, artifacts: context.artifacts })).images[0]
+    ? (
+        await loadImages([input.mask], {
+          root: context.config.workspaceRoot,
+          maxBytes: context.config.maxImageBytes,
+          signal: context.signal,
+          artifacts: context.artifacts,
+        })
+      ).images[0]
     : undefined;
 
   const request: EditRequest = {
@@ -140,14 +148,14 @@ export async function runEdit(input: EditOperationInput, context: OperationConte
   };
 
   const started = Date.now();
-  const result = await selection.backend
-    .edit(request, context)
-    .catch((error: unknown) => {
-      throw withImageModelHint(error, model);
-    });
+  const result = await selection.backend.edit(request, context).catch((error: unknown) => {
+    throw withImageModelHint(error, model);
+  });
   const outcome = await finalize(result, input, context, selection.backend.kind, Date.now() - started);
   if (skipped.length > 0) {
-    outcome.notes.push(`Skipped ${skipped.length} input image(s): ${skipped.map((entry) => `${entry.source} (${entry.reason})`).join("; ")}`);
+    outcome.notes.push(
+      `Skipped ${skipped.length} input image(s): ${skipped.map((entry) => `${entry.source} (${entry.reason})`).join("; ")}`,
+    );
   }
   if (mask) outcome.notes.push("Mask applied.");
   return outcome;
@@ -201,7 +209,7 @@ async function finalize(
       mimeType: image.mimeType,
       bytes: image.data.byteLength,
       inlined: false,
-      ...(imageDimensions(image.data, image.mimeType) ?? {}),
+      ...imageDimensions(image.data, image.mimeType),
     };
 
     if (shouldSave) {
@@ -226,7 +234,15 @@ async function finalize(
       inlineBudget -= image.data.byteLength;
       inlinedCount += 1;
       saved.inlined = true;
-      content.push(imageContent({ data: image.data, mimeType: image.mimeType, base64: image.data.toString("base64"), bytes: image.data.byteLength, source: "generated" }));
+      content.push(
+        imageContent({
+          data: image.data,
+          mimeType: image.mimeType,
+          base64: image.data.toString("base64"),
+          bytes: image.data.byteLength,
+          source: "generated",
+        }),
+      );
     }
 
     if (shouldSave && saved.path) {

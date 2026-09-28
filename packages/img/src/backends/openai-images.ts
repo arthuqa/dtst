@@ -114,7 +114,9 @@ export class OpenAIImagesBackend implements ImageBackend {
   async listModels(context: BackendContext, filter: ModelFilter): Promise<ImageModelInfo[]> {
     const models = await this.client.models.list({ signal: context.signal });
     const ids = models.data.map((model) => model.id);
-    const imageish = ids.filter((id) => /image|dall-?e|flux|stable-diffusion|sdxl|imagen|seedream|qwen-image|gpt-image/i.test(id));
+    const imageish = ids.filter((id) =>
+      /image|dall-?e|flux|stable-diffusion|sdxl|imagen|seedream|qwen-image|gpt-image/i.test(id),
+    );
     const selected = imageish.length > 0 ? imageish : ids;
     return buildModelList(
       selected.map((id) => ({ id, outputModalities: ["image"], backend: this.kind })),
@@ -147,7 +149,11 @@ export class OpenAIImagesBackend implements ImageBackend {
     }
   }
 
-  private async toImages(response: ImagesResponse, request: GenerateRequest, context: BackendContext): Promise<RenderedImage[]> {
+  private async toImages(
+    response: ImagesResponse,
+    request: GenerateRequest,
+    context: BackendContext,
+  ): Promise<RenderedImage[]> {
     const fallbackMime = mimeFromOutputFormat(request.outputFormat, "image/png");
     const entries = response.data ?? [];
     if (entries.length === 0) throw ERROR_UNSUPPORTED.emptyResponse();

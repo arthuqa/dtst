@@ -123,7 +123,9 @@ function sniffBytes(buffer: Uint8Array): string | undefined {
     if (brand === "heic" || brand === "heix" || brand === "mif1") return "image/heic";
   }
   // SVG is text: allow a BOM, XML prolog and whitespace before the root tag.
-  const head = ascii(bytes, 0, Math.min(bytes.length, 1024)).replace(/^\uFEFF/, "").trimStart();
+  const head = ascii(bytes, 0, Math.min(bytes.length, 1024))
+    .replace(/^\uFEFF/, "")
+    .trimStart();
   if (head.startsWith("<svg") || (head.startsWith("<?xml") && head.includes("<svg"))) {
     return "image/svg+xml";
   }
@@ -152,7 +154,11 @@ export function parseDataUrl(value: string): ParsedDataUrl | undefined {
   if (params.includes(";base64")) {
     return { mimeType, base64: payload, data: Buffer.from(payload, "base64") };
   }
-  return { mimeType, base64: Buffer.from(payload, "utf8").toString("base64"), data: Buffer.from(decodeURIComponent(payload), "utf8") };
+  return {
+    mimeType,
+    base64: Buffer.from(payload, "utf8").toString("base64"),
+    data: Buffer.from(decodeURIComponent(payload), "utf8"),
+  };
 }
 
 export function toDataUrl(mimeType: string, base64: string): string {

@@ -24,9 +24,13 @@ export const imgErrors = {
     }),
 
   textInsteadOfImage: (model: string, providerMessage?: string): DtstError =>
-    new DtstError("PROVIDER_ERROR", `The model "${model}" returned text instead of an image.${providerMessage ? ` Provider said: ${providerMessage}` : ""}`, {
-      hint: `OPENAI_MODEL=${model} does not produce images. Point this server at an image model (e.g. "OPENAI_MODEL": "meta/muse-image" in its env block) or pass an image \`model\` explicitly — see \`list_image_models\`.`,
-    }),
+    new DtstError(
+      "PROVIDER_ERROR",
+      `The model "${model}" returned text instead of an image.${providerMessage ? ` Provider said: ${providerMessage}` : ""}`,
+      {
+        hint: `OPENAI_MODEL=${model} does not produce images. Point this server at an image model (e.g. "OPENAI_MODEL": "meta/muse-image" in its env block) or pass an image \`model\` explicitly — see \`list_image_models\`.`,
+      },
+    ),
 
   maskUnsupported: (backend: BackendKind): DtstError =>
     new DtstError("BAD_INPUT", `The ${backend} backend does not support masks.`, {
@@ -55,7 +59,10 @@ export function withImageModelHint(error: unknown, model: string | undefined): D
     /output modalities|no model found|not a valid model|unsupported model|does not support (the )?(requested )?(output|modality|image)/i.test(
       dtst.message,
     );
-  if (!modelShaped || ["PROVIDER_AUTH", "PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT", "NETWORK", "CANCELLED"].includes(dtst.code)) {
+  if (
+    !modelShaped ||
+    ["PROVIDER_AUTH", "PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT", "NETWORK", "CANCELLED"].includes(dtst.code)
+  ) {
     return dtst;
   }
   const label = model?.trim() ? `"${model.trim()}"` : "the configured model";

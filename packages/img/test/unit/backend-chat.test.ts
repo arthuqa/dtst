@@ -63,9 +63,7 @@ describe("ChatModalitiesBackend.generate", () => {
 
   it("keeps the first image and adds a note when the second call fails", async () => {
     const { client, create } = makeChatClient();
-    create
-      .mockResolvedValueOnce(imageResponse())
-      .mockRejectedValueOnce(new Error("provider down"));
+    create.mockResolvedValueOnce(imageResponse()).mockRejectedValueOnce(new Error("provider down"));
     const backend = new ChatModalitiesBackend(client);
 
     const result = await backend.generate({ prompt: "a cat", n: 2 }, makeContext());

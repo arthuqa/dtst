@@ -87,10 +87,7 @@ describe("OpenAIImagesBackend.generate", () => {
   it("downloads URL results", async () => {
     const { client, generate } = makeImagesClient();
     generate.mockResolvedValue({ created: 1, data: [{ url: "https://cdn.test/x.png" }] });
-    vi.stubGlobal(
-      "fetch",
-      async () => new Response(PNG, { status: 200, headers: { "content-type": "image/png" } }),
-    );
+    vi.stubGlobal("fetch", async () => new Response(PNG, { status: 200, headers: { "content-type": "image/png" } }));
 
     const backend = new OpenAIImagesBackend(client);
     const result = await backend.generate({ prompt: "a cat", n: 1 }, makeContext());
@@ -125,10 +122,7 @@ describe("OpenAIImagesBackend.edit", () => {
     edit.mockResolvedValue({ created: 1, data: [{ b64_json: PNG.toString("base64") }] });
     const backend = new OpenAIImagesBackend(client);
 
-    await backend.edit(
-      { prompt: "make it blue", n: 1, images: [loadedPng()], mask: loadedPng() },
-      makeContext(),
-    );
+    await backend.edit({ prompt: "make it blue", n: 1, images: [loadedPng()], mask: loadedPng() }, makeContext());
 
     const body = edit.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(body["image"]).toBeDefined();

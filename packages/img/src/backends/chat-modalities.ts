@@ -14,10 +14,7 @@
  */
 
 import type OpenAI from "openai";
-import type {
-  ChatCompletion,
-  ChatCompletionCreateParamsNonStreaming,
-} from "openai/resources/chat/completions";
+import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 import { type LoadedImage, toChatImagePart } from "@dtst/internal";
 import { composeChatPrompt, buildPrompt } from "../prompt";
 import { ERROR_UNSUPPORTED } from "../errors";
@@ -89,10 +86,9 @@ export class ChatModalitiesBackend implements ImageBackend {
    * single boundary where the request leaves the process.
    */
   private async createChatCompletion(body: ChatImageBody, signal: AbortSignal): Promise<ChatCompletion> {
-    return (await this.client.chat.completions.create(
-      body as unknown as ChatCompletionCreateParamsNonStreaming,
-      { signal },
-    )) as ChatCompletion;
+    return (await this.client.chat.completions.create(body as unknown as ChatCompletionCreateParamsNonStreaming, {
+      signal,
+    })) as ChatCompletion;
   }
 
   private async runBatch(
@@ -118,7 +114,11 @@ export class ChatModalitiesBackend implements ImageBackend {
         created ??= result.created;
       } catch (error) {
         failure = error;
-        context.log.warn("chat image call failed", { index, total, message: error instanceof Error ? error.message : String(error) });
+        context.log.warn("chat image call failed", {
+          index,
+          total,
+          message: error instanceof Error ? error.message : String(error),
+        });
         break;
       }
       await context.progress.report(index + 1, total, `${index + 1}/${total} image(s)`);
@@ -134,7 +134,8 @@ export class ChatModalitiesBackend implements ImageBackend {
         }).`,
       );
     }
-    if (total > 1) notes.push(`This backend has no batch parameter, so the images were generated in ${total} sequential calls.`);
+    if (total > 1)
+      notes.push(`This backend has no batch parameter, so the images were generated in ${total} sequential calls.`);
 
     return {
       images,
@@ -158,10 +159,7 @@ export class ChatModalitiesBackend implements ImageBackend {
     }
     content.push({
       type: "text",
-      text:
-        inputImages.length > 0
-          ? buildPrompt(request)
-          : composeChatPrompt(request),
+      text: inputImages.length > 0 ? buildPrompt(request) : composeChatPrompt(request),
     });
 
     const imageConfig = compact({
@@ -187,14 +185,17 @@ export class ChatModalitiesBackend implements ImageBackend {
       if (!isUnsupportedParameterError(error)) throw error;
       context.log.warn("provider rejected image_config/modalities extras; retrying with the bare minimum", { model });
       delete body.image_config;
-      response = await this.createChatCompletion({ model, messages: body.messages, modalities: ["image"] }, context.signal);
+      response = await this.createChatCompletion(
+        { model, messages: body.messages, modalities: ["image"] },
+        context.signal,
+      );
     }
 
     const message = response.choices?.[0]?.message as
-      | { content?: string | null; images?: AssistantImageEntry[] }
-      | undefined;
+      { content?: string | null; images?: AssistantImageEntry[] } | undefined;
     const entries: AssistantImageEntry[] = Array.isArray(message?.images) ? message.images : [];
-    const fallbackMime = request.outputFormat === "jpeg" ? "image/jpeg" : request.outputFormat === "webp" ? "image/webp" : "image/png";
+    const fallbackMime =
+      request.outputFormat === "jpeg" ? "image/jpeg" : request.outputFormat === "webp" ? "image/webp" : "image/png";
 
     const images: RenderedImage[] = [];
     for (const entry of entries) {

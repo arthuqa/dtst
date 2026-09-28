@@ -10,7 +10,7 @@ import { withImageModelHint } from "../../src/errors";
 
 describe("withImageModelHint", () => {
   it("keeps the provider error and adds the image-model hint for 404s", () => {
-    const original = new DtstError("PROVIDER_UNSUPPORTED", "No model found for \"gpt-6-luna\"", { status: 404 });
+    const original = new DtstError("PROVIDER_UNSUPPORTED", 'No model found for "gpt-6-luna"', { status: 404 });
     const rewritten = withImageModelHint(original, "gpt-6-luna");
     expect(rewritten.code).toBe("PROVIDER_UNSUPPORTED");
     expect(rewritten.status).toBe(404);
@@ -20,9 +20,13 @@ describe("withImageModelHint", () => {
   });
 
   it("handles the 'output modalities' rejection", () => {
-    const original = new DtstError("PROVIDER_ERROR", "No endpoints found that support the requested output modalities: image, text", {
-      status: 404,
-    });
+    const original = new DtstError(
+      "PROVIDER_ERROR",
+      "No endpoints found that support the requested output modalities: image, text",
+      {
+        status: 404,
+      },
+    );
     expect(withImageModelHint(original, "openai/gpt-6-luna").hint).toContain("list_image_models");
   });
 
@@ -40,14 +44,19 @@ describe("withImageModelHint", () => {
   });
 
   it("leaves unrelated validation errors alone", () => {
-    const original = new DtstError("PROVIDER_ERROR", "400 invalid_request_error: size must be one of 1024x1024", { status: 400 });
+    const original = new DtstError("PROVIDER_ERROR", "400 invalid_request_error: size must be one of 1024x1024", {
+      status: 400,
+    });
     const rewritten = withImageModelHint(original, "gpt-image-1");
     expect(rewritten.hint).toBeUndefined();
     expect(rewritten.message).toBe(original.message);
   });
 
   it("accepts a missing model name", () => {
-    const rewritten = withImageModelHint(new DtstError("PROVIDER_UNSUPPORTED", "not found", { status: 404 }), undefined);
+    const rewritten = withImageModelHint(
+      new DtstError("PROVIDER_UNSUPPORTED", "not found", { status: 404 }),
+      undefined,
+    );
     expect(rewritten.hint).toContain("OPENAI_MODEL");
   });
 });

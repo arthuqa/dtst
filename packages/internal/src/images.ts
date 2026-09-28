@@ -65,7 +65,12 @@ export function isHttpUrl(value: string): boolean {
 export function looksLikeImageReference(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
-  if (trimmed.startsWith("data:") || trimmed.startsWith("file://") || trimmed.startsWith("artifact://") || trimmed.startsWith("dtst://")) {
+  if (
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("file://") ||
+    trimmed.startsWith("artifact://") ||
+    trimmed.startsWith("dtst://")
+  ) {
     return true;
   }
   if (isHttpUrl(trimmed)) return true;
@@ -76,11 +81,7 @@ export function looksLikeImageReference(value: string): boolean {
 /** Human-readable image summary for tool output. */
 export function describeImage(image: LoadedImage): string {
   const size = image.width && image.height ? `${image.width}x${image.height}` : undefined;
-  const parts = [
-    image.label ?? image.source,
-    image.mimeType,
-    `${formatBytes(image.bytes)}${size ? `, ${size}` : ""}`,
-  ];
+  const parts = [image.label ?? image.source, image.mimeType, `${formatBytes(image.bytes)}${size ? `, ${size}` : ""}`];
   return parts.join(" · ");
 }
 
@@ -306,7 +307,10 @@ export function toImageDataUrl(image: LoadedImage): string {
 }
 
 /** OpenAI chat/image content part for a loaded image. */
-export function toChatImagePart(image: LoadedImage, detail?: "auto" | "low" | "high"): {
+export function toChatImagePart(
+  image: LoadedImage,
+  detail?: "auto" | "low" | "high",
+): {
   type: "image_url";
   image_url: { url: string; detail?: "auto" | "low" | "high" };
 } {
@@ -379,7 +383,10 @@ export function assertImageSupported(image: LoadedImage, opts: { requireWidelySu
   if (!isImageMime(image.mimeType)) {
     throw badInput(`Unsupported image type ${image.mimeType} for ${image.source}.`);
   }
-  if (opts.requireWidelySupported && !["image/png", "image/jpeg", "image/webp"].includes(normalizeMime(image.mimeType))) {
+  if (
+    opts.requireWidelySupported &&
+    !["image/png", "image/jpeg", "image/webp"].includes(normalizeMime(image.mimeType))
+  ) {
     logger.debug("image format may not be accepted by every provider", { mimeType: image.mimeType });
   }
 }

@@ -21,7 +21,9 @@ export const editImageSchema = z.object({
   prompt: z
     .string()
     .min(1)
-    .describe("The change to apply, e.g. \"replace the background with a sunset beach\" or \"make it look like a pencil sketch\"."),
+    .describe(
+      'The change to apply, e.g. "replace the background with a sunset beach" or "make it look like a pencil sketch".',
+    ),
   images: z
     .array(z.string())
     .min(1)

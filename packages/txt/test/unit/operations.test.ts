@@ -136,16 +136,16 @@ describe("runWriteText", () => {
     expect(skipped).toHaveLength(1);
     expect(skipped[0]?.source).toBe(missingPath);
     expect(typeof skipped[0]?.reason).toBe("string");
-    expect(
-      outcome.content.some((block) => block.type === "text" && block.text.includes("Skipped 1 image(s)")),
-    ).toBe(true);
+    expect(outcome.content.some((block) => block.type === "text" && block.text.includes("Skipped 1 image(s)"))).toBe(
+      true,
+    );
 
     // Only the readable image is attached to the request.
     const messages = messagesOf(bodyAt(fetchStub, 0));
     const last = messages[messages.length - 1];
     expect(last?.role).toBe("user");
     expect(Array.isArray(last?.content)).toBe(true);
-    expect((last?.content as unknown[]).length).toBe(2);
+    expect(last?.content).toHaveLength(2);
   });
 
   it("sets response_format when format is json", async () => {
@@ -194,7 +194,7 @@ describe("runChat", () => {
     expect(messages[2]).toEqual({ role: "assistant", content: "second" });
     expect(messages[3]?.role).toBe("user");
     expect(Array.isArray(messages[3]?.content)).toBe(true);
-    expect((messages[3]?.content as unknown[]).length).toBe(2);
+    expect(messages[3]?.content).toHaveLength(2);
   });
 
   it("maps sampling parameters and omits absent ones", async () => {
@@ -226,7 +226,14 @@ describe("runChat", () => {
     await runChat({ messages: [{ role: "user", content: "hi" }] }, context);
 
     const bare = bodyAt(fetchStub, 1);
-    for (const key of ["max_completion_tokens", "temperature", "top_p", "stop", "reasoning_effort", "response_format"]) {
+    for (const key of [
+      "max_completion_tokens",
+      "temperature",
+      "top_p",
+      "stop",
+      "reasoning_effort",
+      "response_format",
+    ]) {
       expect(bare).not.toHaveProperty(key);
     }
   });

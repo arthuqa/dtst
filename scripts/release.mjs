@@ -25,7 +25,9 @@ const flags = new Set(args.filter((entry) => entry.startsWith("--")));
 const [target, bump] = positional;
 
 if (!target || !bump || !(target in PACKAGES || target === "both")) {
-  console.error("usage: node scripts/release.mjs <img|txt|both> <patch|minor|major|x.y.z> [--push] [--skip-checks] [--yes]");
+  console.error(
+    "usage: node scripts/release.mjs <img|txt|both> <patch|minor|major|x.y.z> [--push] [--skip-checks] [--yes]",
+  );
   process.exit(2);
 }
 

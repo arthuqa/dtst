@@ -1,18 +1,16 @@
 import { describe, expect, it } from "vitest";
-import {
-  extensionForMime,
-  isProbablyBase64,
-  isTextMime,
-  parseDataUrl,
-  sniffMime,
-  toDataUrl,
-} from "@dtst/internal";
+import { extensionForMime, isProbablyBase64, isTextMime, parseDataUrl, sniffMime, toDataUrl } from "@dtst/internal";
 import { makePng } from "./helpers";
 
 const PNG = makePng();
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]);
 const GIF = Buffer.from("GIF89a\u0000\u0000", "latin1");
-const WEBP = Buffer.concat([Buffer.from("RIFF", "ascii"), Buffer.from([0, 0, 0, 0]), Buffer.from("WEBP", "ascii"), Buffer.from([0, 0, 0, 0])]);
+const WEBP = Buffer.concat([
+  Buffer.from("RIFF", "ascii"),
+  Buffer.from([0, 0, 0, 0]),
+  Buffer.from("WEBP", "ascii"),
+  Buffer.from([0, 0, 0, 0]),
+]);
 const BMP = Buffer.from([0x42, 0x4d, 0x00, 0x00, 0x00, 0x00]);
 const TIFF_LE = Buffer.from([0x49, 0x49, 0x2a, 0x00]);
 const TIFF_BE = Buffer.from([0x4d, 0x4d, 0x00, 0x2a]);

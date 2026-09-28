@@ -79,9 +79,7 @@ describe("artifactBlocks", () => {
     expect(link).toMatchObject({ type: "resource_link", name: "note.txt" });
     expect((link as { uri: string }).uri.startsWith("file://")).toBe(true);
 
-    const embedded = blocks.find((block) => block.type === "resource") as
-      | { resource: { text?: string } }
-      | undefined;
+    const embedded = blocks.find((block) => block.type === "resource") as { resource: { text?: string } } | undefined;
     expect(embedded?.resource.text).toBe("hello");
 
     const summary = blocks.find((block) => block.type === "text") as { text: string } | undefined;
@@ -101,9 +99,7 @@ describe("artifactBlocks", () => {
       inline: Buffer.from([1, 2, 3]),
       mimeType: "application/octet-stream",
     });
-    const embedded = blocks.find((block) => block.type === "resource") as
-      | { resource: { blob?: string } }
-      | undefined;
+    const embedded = blocks.find((block) => block.type === "resource") as { resource: { blob?: string } } | undefined;
     expect(embedded?.resource.blob).toBe(Buffer.from([1, 2, 3]).toString("base64"));
   });
 });

@@ -73,9 +73,22 @@ export const DEFAULT_MAX_CONTEXT_FILES = 64;
 export const DEFAULT_MAX_CONTEXT_IMAGES = 8;
 
 const GLOB_CHARS = /[*?[\]{}]/;
-const IGNORED_DIRS = new Set(["node_modules", ".git", ".next", "dist", "build", "target", "__pycache__", ".venv", "vendor"]);
+const IGNORED_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".next",
+  "dist",
+  "build",
+  "target",
+  "__pycache__",
+  ".venv",
+  "vendor",
+]);
 
-export async function gatherContext(request: ContextRequest, options: GatherContextOptions = {}): Promise<ContextResult> {
+export async function gatherContext(
+  request: ContextRequest,
+  options: GatherContextOptions = {},
+): Promise<ContextResult> {
   const maxPerSource = options.maxPerSourceBytes ?? DEFAULT_MAX_PER_SOURCE_BYTES;
   const maxTotal = options.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_CONTEXT_FILES;
@@ -115,7 +128,13 @@ export async function gatherContext(request: ContextRequest, options: GatherCont
   const inline = request.text ?? [];
   for (const [index, value] of inline.entries()) {
     if (typeof value !== "string" || value.length === 0) continue;
-    pushChunk({ source: `inline:${index}`, label: `inline text #${index + 1}`, text: value, bytes: Buffer.byteLength(value), truncated: false });
+    pushChunk({
+      source: `inline:${index}`,
+      label: `inline text #${index + 1}`,
+      text: value,
+      bytes: Buffer.byteLength(value),
+      truncated: false,
+    });
   }
 
   const files = [...(request.files ?? [])];
@@ -200,14 +219,18 @@ async function ingestSource(source: string, sink: IngestSink): Promise<void> {
     return;
   }
 
-  const resolved = resolveUserPath(trimmed.startsWith("file://") ? trimmed.slice("file://".length) : trimmed, sink.options);
+  const resolved = resolveUserPath(
+    trimmed.startsWith("file://") ? trimmed.slice("file://".length) : trimmed,
+    sink.options,
+  );
   let data: Buffer;
   try {
     data = await fs.readFile(resolved);
   } catch (error) {
     const err = error as NodeJS.ErrnoException;
     if (err.code === "ENOENT") sink.skipped.push({ source: resolved, reason: "file not found" });
-    else if (err.code === "EISDIR") sink.skipped.push({ source: resolved, reason: "is a directory; pass it via `dirs`" });
+    else if (err.code === "EISDIR")
+      sink.skipped.push({ source: resolved, reason: "is a directory; pass it via `dirs`" });
     else sink.skipped.push({ source: resolved, reason: err.message });
     return;
   }
@@ -246,7 +269,10 @@ async function ingestSource(source: string, sink: IngestSink): Promise<void> {
 
 async function ingestUrl(url: string, sink: IngestSink): Promise<void> {
   try {
-    const head = await fetchBinary(url, { maxBytes: sink.maxPerSource, ...(sink.options.signal ? { signal: sink.options.signal } : {}) });
+    const head = await fetchBinary(url, {
+      maxBytes: sink.maxPerSource,
+      ...(sink.options.signal ? { signal: sink.options.signal } : {}),
+    });
     const sniffed = sniffMime(head.data, head.contentType);
     if (sniffed && sniffed.mimeType.startsWith("image/")) {
       const image = await loadImage(url, sink.options);
@@ -281,7 +307,8 @@ async function ingestUrl(url: string, sink: IngestSink): Promise<void> {
       truncated,
     });
   } catch (error) {
-    const message = error instanceof DtstError ? error.format() : error instanceof Error ? error.message : String(error);
+    const message =
+      error instanceof DtstError ? error.format() : error instanceof Error ? error.message : String(error);
     sink.skipped.push({ source: url, reason: message });
   }
 }

@@ -16,12 +16,7 @@ export function be32(value: number): Buffer {
 /** Build a structurally valid (but not decodable) PNG with the given size. */
 export function makePng(width = 1, height = 1): Buffer {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const ihdrData = Buffer.concat([
-    be32(width),
-    be32(height),
-    Buffer.from([8, 6, 0, 0, 0]),
-    be32(0),
-  ]);
+  const ihdrData = Buffer.concat([be32(width), be32(height), Buffer.from([8, 6, 0, 0, 0]), be32(0)]);
   const ihdr = Buffer.concat([Buffer.from("IHDR", "ascii"), ihdrData]);
   const idat = Buffer.concat([Buffer.from("IDAT", "ascii"), Buffer.from([1, 2, 3, 4]), be32(0)]);
   const iend = Buffer.concat([Buffer.from("IEND", "ascii"), be32(0)]);

@@ -124,7 +124,10 @@ export function registerReadContextTool(server: ServerLike, runtime: ToolRuntime
         `chunks: ${result.chunks.length} (${formatBytes(result.totalBytes)})`,
         `images: ${result.images.length}`,
         ...(result.skipped.length > 0
-          ? [`skipped: ${result.skipped.length}`, ...result.skipped.slice(0, 20).map((entry) => `  - ${entry.source}: ${entry.reason}`)]
+          ? [
+              `skipped: ${result.skipped.length}`,
+              ...result.skipped.slice(0, 20).map((entry) => `  - ${entry.source}: ${entry.reason}`),
+            ]
           : []),
       ].join("\n");
       blocks.push(text(summary));

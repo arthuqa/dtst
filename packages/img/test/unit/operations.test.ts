@@ -3,15 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArtifactStore, resetClientCache } from "@dtst/internal";
 import { runGenerate, type OperationContext } from "../../src/operations";
-import {
-  cleanupDir,
-  jsonResponse,
-  makePng,
-  makeTempDir,
-  recordingProgress,
-  silentLogger,
-  testConfig,
-} from "./helpers";
+import { cleanupDir, jsonResponse, makePng, makeTempDir, recordingProgress, silentLogger, testConfig } from "./helpers";
 
 const PNG = makePng();
 
@@ -117,10 +109,7 @@ describe("runGenerate", () => {
   it("replaces the file when overwrite is true", async () => {
     stubImageFetch();
     const first = await runGenerate({ prompt: "a cat", n: 1, filename: "pic.png" }, makeContext());
-    const second = await runGenerate(
-      { prompt: "a cat", n: 1, filename: "pic.png", overwrite: true },
-      makeContext(),
-    );
+    const second = await runGenerate({ prompt: "a cat", n: 1, filename: "pic.png", overwrite: true }, makeContext());
 
     expect(second.images[0]?.path).toBe(first.images[0]?.path);
     expect(path.basename(second.images[0]!.path!)).toBe("pic.png");
@@ -128,10 +117,7 @@ describe("runGenerate", () => {
 
   it("omits image blocks when inline is false", async () => {
     stubImageFetch();
-    const outcome = await runGenerate(
-      { prompt: "a cat", n: 1, filename: "pic.png", inline: false },
-      makeContext(),
-    );
+    const outcome = await runGenerate({ prompt: "a cat", n: 1, filename: "pic.png", inline: false }, makeContext());
 
     const types = outcome.content.map((block) => block.type);
     expect(types).not.toContain("image");

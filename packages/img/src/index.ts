@@ -3,7 +3,13 @@
  * OpenAI-compatible API.
  */
 
-export { createImgServer, runImgServer, SERVER_INSTRUCTIONS, type CreateImgServerOptions, type ImgServerBundle } from "./server";
+export {
+  createImgServer,
+  runImgServer,
+  SERVER_INSTRUCTIONS,
+  type CreateImgServerOptions,
+  type ImgServerBundle,
+} from "./server";
 export {
   runGenerate,
   runEdit,
@@ -15,7 +21,13 @@ export {
   type SavedImage,
 } from "./operations";
 export { createToolRuntime, type ToolRuntime } from "./runtime";
-export { resolveBackend, listImageModels, isOpenRouter, describeSelection, type BackendSelection } from "./backends/select";
+export {
+  resolveBackend,
+  listImageModels,
+  isOpenRouter,
+  describeSelection,
+  type BackendSelection,
+} from "./backends/select";
 export type {
   BackendCapabilities,
   BackendContext,

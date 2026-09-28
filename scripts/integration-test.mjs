@@ -92,7 +92,10 @@ async function testImg() {
     const tools = await client.listTools();
     const names = tools.tools.map((tool) => tool.name).sort();
     check("img: tools registered", names.length === 3, names.join(", "));
-    check("img: generate_image has a schema", Boolean(tools.tools.find((t) => t.name === "generate_image")?.inputSchema));
+    check(
+      "img: generate_image has a schema",
+      Boolean(tools.tools.find((t) => t.name === "generate_image")?.inputSchema),
+    );
 
     const listed = await call(client, "list_image_models", { query: "muse", limit: 10 });
     check("img: list_image_models responds", listed.text.includes("models:"), listed.text.split("\n")[0]);
@@ -110,12 +113,23 @@ async function testImg() {
     noteCost(structured.usage);
     const image = structured.images?.[0];
     check("img: returned a saved path", typeof image?.path === "string" && existsSync(image.path), image?.path);
-    check("img: sniffed an image mime type", /^image\//.test(image?.mimeType ?? ""), image?.mimeType);
-    check("img: reported dimensions", Boolean(image?.width && image?.height), image ? `${image.width}x${image.height}` : "-");
+    check("img: sniffed an image mime type", (image?.mimeType ?? "").startsWith("image/"), image?.mimeType);
+    check(
+      "img: reported dimensions",
+      Boolean(image?.width && image?.height),
+      image ? `${image.width}x${image.height}` : "-",
+    );
     check("img: returned an artifact uri", typeof image?.artifact === "string", image?.artifact);
     const blocks = generated.result.content ?? [];
-    check("img: inlined image content block", blocks.some((block) => block.type === "image"), `${blocks.length} blocks`);
-    check("img: returned a resource link", blocks.some((block) => block.type === "resource_link"));
+    check(
+      "img: inlined image content block",
+      blocks.some((block) => block.type === "image"),
+      `${blocks.length} blocks`,
+    );
+    check(
+      "img: returned a resource link",
+      blocks.some((block) => block.type === "resource_link"),
+    );
 
     // --- read back the artifact resource ----------------------------------
     if (image?.artifact) {
@@ -174,7 +188,10 @@ async function testTxt() {
     check("txt: tools registered", names.length === 4, names.join(", "));
 
     const prompts = await client.listPrompts();
-    check("txt: write prompt registered", prompts.prompts.some((prompt) => prompt.name === "write"));
+    check(
+      "txt: write prompt registered",
+      prompts.prompts.some((prompt) => prompt.name === "write"),
+    );
 
     const models = await call(client, "list_models", { query: "luna", limit: 5 });
     check("txt: list_models responds", models.text.includes("models:"), models.text.split("\n")[0]);
@@ -186,9 +203,20 @@ async function testTxt() {
     });
     check("txt: read_context is not an error", context.result.isError !== true, context.text.split("\n")[0]);
     const contextStructured = context.result.structuredContent ?? {};
-    check("txt: read a text chunk", (contextStructured.chunks?.length ?? 0) >= 1, `${contextStructured.chunks?.length} chunks`);
-    check("txt: read an image", (contextStructured.images?.length ?? 0) >= 1, `${contextStructured.images?.length} images`);
-    check("txt: returned image content blocks", (context.result.content ?? []).some((block) => block.type === "image"));
+    check(
+      "txt: read a text chunk",
+      (contextStructured.chunks?.length ?? 0) >= 1,
+      `${contextStructured.chunks?.length} chunks`,
+    );
+    check(
+      "txt: read an image",
+      (contextStructured.images?.length ?? 0) >= 1,
+      `${contextStructured.images?.length} images`,
+    );
+    check(
+      "txt: returned image content blocks",
+      (context.result.content ?? []).some((block) => block.type === "image"),
+    );
 
     const resources = await client.listResources();
     check(
@@ -216,10 +244,26 @@ async function testTxt() {
     check("txt: write_text succeeded", written.result.isError !== true, written.text.split("\n")[0]);
     const writtenStructured = written.result.structuredContent ?? {};
     noteCost(writtenStructured.usage);
-    check("txt: wrote the requested file", writtenStructured.saved?.path?.endsWith("release-summary.md") === true, writtenStructured.saved?.path);
-    check("txt: reported usage", typeof writtenStructured.usage?.totalTokens === "number", JSON.stringify(writtenStructured.usage));
-    check("txt: reported context summary", (writtenStructured.context?.chunks ?? 0) >= 1, JSON.stringify(writtenStructured.context ?? {}));
-    check("txt: reported the skipped image", (writtenStructured.skippedImages?.length ?? 0) === 1, JSON.stringify(writtenStructured.skippedImages ?? []));
+    check(
+      "txt: wrote the requested file",
+      writtenStructured.saved?.path?.endsWith("release-summary.md") === true,
+      writtenStructured.saved?.path,
+    );
+    check(
+      "txt: reported usage",
+      typeof writtenStructured.usage?.totalTokens === "number",
+      JSON.stringify(writtenStructured.usage),
+    );
+    check(
+      "txt: reported context summary",
+      (writtenStructured.context?.chunks ?? 0) >= 1,
+      JSON.stringify(writtenStructured.context ?? {}),
+    );
+    check(
+      "txt: reported the skipped image",
+      (writtenStructured.skippedImages?.length ?? 0) === 1,
+      JSON.stringify(writtenStructured.skippedImages ?? []),
+    );
 
     // --- chat -------------------------------------------------------------
     const chat = await call(client, "chat", {
@@ -231,7 +275,11 @@ async function testTxt() {
       max_tokens: 16,
     });
     check("txt: chat succeeded", chat.result.isError !== true, chat.text.split("\n")[0]);
-    check("txt: chat followed the latest turn", /PING/i.test(chat.result.structuredContent?.text ?? ""), chat.result.structuredContent?.text);
+    check(
+      "txt: chat followed the latest turn",
+      /PING/i.test(chat.result.structuredContent?.text ?? ""),
+      chat.result.structuredContent?.text,
+    );
     noteCost(chat.result.structuredContent?.usage);
 
     // --- prompt template --------------------------------------------------
@@ -286,7 +334,9 @@ if (target === "txt" || target === "all") await testTxt();
 
 console.log("\n──────── summary ────────");
 for (const line of results) console.log(line);
-console.log(`\n${results.length - failures}/${results.length} checks passed · provider spend ≈ $${cost.toFixed(4)} · ${((Date.now() - started) / 1000).toFixed(1)}s`);
+console.log(
+  `\n${results.length - failures}/${results.length} checks passed · provider spend ≈ $${cost.toFixed(4)} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
+);
 if (failures > 0) {
   console.error(`\n${failures} check(s) FAILED`);
   process.exit(1);

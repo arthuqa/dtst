@@ -29,7 +29,14 @@ import {
   runCli,
 } from "@dtst/internal";
 import { describeModel, listModels } from "./models";
-import { runChat, runWriteText, type ChatInput, type OperationContext, type TextOutcome, type WriteTextInput } from "./operations";
+import {
+  runChat,
+  runWriteText,
+  type ChatInput,
+  type OperationContext,
+  type TextOutcome,
+  type WriteTextInput,
+} from "./operations";
 import type { OutputFormat, Verbosity } from "./prompt";
 import { runTxtServer } from "./server";
 
@@ -121,7 +128,16 @@ function saveFields(values: CliValues): SaveFields {
 
 type SamplingFields = Pick<
   WriteTextInput,
-  "model" | "system" | "max_tokens" | "temperature" | "top_p" | "stop" | "reasoning_effort" | "format" | "verbosity" | "stream"
+  | "model"
+  | "system"
+  | "max_tokens"
+  | "temperature"
+  | "top_p"
+  | "stop"
+  | "reasoning_effort"
+  | "format"
+  | "verbosity"
+  | "stream"
 >;
 
 function samplingFields(values: CliValues): SamplingFields {
@@ -147,22 +163,61 @@ function samplingFields(values: CliValues): SamplingFields {
 }
 
 const SAMPLING_OPTIONS = [
-  { name: "model", alias: "m", type: "string" as const, description: "Model id (default: OPENAI_MODEL).", placeholder: "model" },
+  {
+    name: "model",
+    alias: "m",
+    type: "string" as const,
+    description: "Model id (default: OPENAI_MODEL).",
+    placeholder: "model",
+  },
   { name: "system", type: "string" as const, description: "Extra system-level guidance.", placeholder: "text" },
-  { name: "max-tokens", type: "number" as const, description: "Upper bound on generated tokens.", placeholder: "count" },
+  {
+    name: "max-tokens",
+    type: "number" as const,
+    description: "Upper bound on generated tokens.",
+    placeholder: "count",
+  },
   { name: "temperature", type: "number" as const, description: "Sampling temperature (0-2).", placeholder: "0-2" },
-  { name: "top-p", type: "number" as const, description: "Nucleus sampling probability mass (0-1).", placeholder: "0-1" },
-  { name: "reasoning-effort", type: "string" as const, description: "low|medium|high, for models that support it.", placeholder: "level" },
+  {
+    name: "top-p",
+    type: "number" as const,
+    description: "Nucleus sampling probability mass (0-1).",
+    placeholder: "0-1",
+  },
+  {
+    name: "reasoning-effort",
+    type: "string" as const,
+    description: "low|medium|high, for models that support it.",
+    placeholder: "level",
+  },
   { name: "format", type: "string" as const, description: "text|markdown|json.", placeholder: "format" },
   { name: "verbosity", type: "string" as const, description: "concise|balanced|detailed.", placeholder: "level" },
-  { name: "stream", type: "boolean" as const, description: "Stream tokens and report progress (slower start, live progress)." },
+  {
+    name: "stream",
+    type: "boolean" as const,
+    description: "Stream tokens and report progress (slower start, live progress).",
+  },
 ] as const;
 
 const SAVE_OPTIONS = [
-  { name: "out", type: "string" as const, description: "Exact file or directory to write the result to.", placeholder: "path" },
+  {
+    name: "out",
+    type: "string" as const,
+    description: "Exact file or directory to write the result to.",
+    placeholder: "path",
+  },
   { name: "out-dir", type: "string" as const, description: "Directory to write into.", placeholder: "dir" },
-  { name: "filename", type: "string" as const, description: "Preferred file name (extension from --format).", placeholder: "name" },
-  { name: "overwrite", type: "boolean" as const, description: "Replace an existing file instead of adding -1, -2 suffixes." },
+  {
+    name: "filename",
+    type: "string" as const,
+    description: "Preferred file name (extension from --format).",
+    placeholder: "name",
+  },
+  {
+    name: "overwrite",
+    type: "boolean" as const,
+    description: "Replace an existing file instead of adding -1, -2 suffixes.",
+  },
   { name: "no-save", type: "boolean" as const, description: "Never write to disk." },
 ] as const;
 
@@ -171,10 +226,33 @@ const writeCommand: CliCommandSpec = {
   summary: "Write text from instructions, optional source material and context.",
   positionals: [{ name: "instructions", required: true, description: "The writing task." }],
   options: [
-    { name: "input", type: "string" as const, description: "Inline source material to transform.", placeholder: "text" },
-    { name: "input-file", type: "string" as const, description: "Read the source material from a file (or a glob).", placeholder: "path" },
-    { name: "context", type: "string" as const, multiple: true, description: "Context source: file, glob, directory, URL or dtst:// artifact. Repeatable.", placeholder: "source" },
-    { name: "image", alias: "i", type: "string" as const, multiple: true, description: "Image for vision models (path, glob, URL, data URL). Repeatable.", placeholder: "source" },
+    {
+      name: "input",
+      type: "string" as const,
+      description: "Inline source material to transform.",
+      placeholder: "text",
+    },
+    {
+      name: "input-file",
+      type: "string" as const,
+      description: "Read the source material from a file (or a glob).",
+      placeholder: "path",
+    },
+    {
+      name: "context",
+      type: "string" as const,
+      multiple: true,
+      description: "Context source: file, glob, directory, URL or dtst:// artifact. Repeatable.",
+      placeholder: "source",
+    },
+    {
+      name: "image",
+      alias: "i",
+      type: "string" as const,
+      multiple: true,
+      description: "Image for vision models (path, glob, URL, data URL). Repeatable.",
+      placeholder: "source",
+    },
     ...SAMPLING_OPTIONS,
     ...SAVE_OPTIONS,
   ],
@@ -214,8 +292,20 @@ const chatCommand: CliCommandSpec = {
   summary: "Send a chat completion (single message or a full message history).",
   positionals: [{ name: "message", required: true, description: "The user message to send." }],
   options: [
-    { name: "messages", type: "string" as const, description: 'Full conversation as JSON: [{"role":"user","content":"…"}].', placeholder: "json" },
-    { name: "image", alias: "i", type: "string" as const, multiple: true, description: "Image for the last user turn. Repeatable.", placeholder: "source" },
+    {
+      name: "messages",
+      type: "string" as const,
+      description: 'Full conversation as JSON: [{"role":"user","content":"…"}].',
+      placeholder: "json",
+    },
+    {
+      name: "image",
+      alias: "i",
+      type: "string" as const,
+      multiple: true,
+      description: "Image for the last user turn. Repeatable.",
+      placeholder: "source",
+    },
     ...SAMPLING_OPTIONS,
     ...SAVE_OPTIONS,
   ],
@@ -231,7 +321,10 @@ const chatCommand: CliCommandSpec = {
       if (!Array.isArray(parsed)) throw new Error("--messages must be a JSON array of {role, content} objects.");
       messages = parsed.map((entry) => {
         const record = entry as { role?: unknown; content?: unknown };
-        const role = typeof record.role === "string" && ["system", "user", "assistant"].includes(record.role) ? record.role : "user";
+        const role =
+          typeof record.role === "string" && ["system", "user", "assistant"].includes(record.role)
+            ? record.role
+            : "user";
         return { role: role as "system" | "user" | "assistant", content: String(record.content ?? "") };
       });
     } else {
@@ -255,11 +348,39 @@ const readCommand: CliCommandSpec = {
   summary: "Read files, globs, directories or URLs and print them.",
   positionals: [{ name: "sources", description: "File paths, globs or URLs." }],
   options: [
-    { name: "dir", type: "string" as const, multiple: true, description: "Directories to read (non-recursive). Repeatable.", placeholder: "dir" },
-    { name: "url", type: "string" as const, multiple: true, description: "URLs to fetch. Repeatable.", placeholder: "url" },
-    { name: "artifact", type: "string" as const, multiple: true, description: "dtst:// artifact URIs. Repeatable.", placeholder: "uri" },
-    { name: "max-bytes", type: "number" as const, description: "Per-source byte budget (default 262144).", placeholder: "bytes" },
-    { name: "max-total-bytes", type: "number" as const, description: "Total byte budget (default 1048576).", placeholder: "bytes" },
+    {
+      name: "dir",
+      type: "string" as const,
+      multiple: true,
+      description: "Directories to read (non-recursive). Repeatable.",
+      placeholder: "dir",
+    },
+    {
+      name: "url",
+      type: "string" as const,
+      multiple: true,
+      description: "URLs to fetch. Repeatable.",
+      placeholder: "url",
+    },
+    {
+      name: "artifact",
+      type: "string" as const,
+      multiple: true,
+      description: "dtst:// artifact URIs. Repeatable.",
+      placeholder: "uri",
+    },
+    {
+      name: "max-bytes",
+      type: "number" as const,
+      description: "Per-source byte budget (default 262144).",
+      placeholder: "bytes",
+    },
+    {
+      name: "max-total-bytes",
+      type: "number" as const,
+      description: "Total byte budget (default 1048576).",
+      placeholder: "bytes",
+    },
   ],
   examples: ["txt read src/index.ts README.md", 'txt read "docs/*.md" --json'],
   async run({ values, positionals, out, json, log }) {
@@ -273,8 +394,12 @@ const readCommand: CliCommandSpec = {
       },
       {
         root: config.workspaceRoot,
-        ...(numberValue(values, "max-bytes") === undefined ? {} : { maxPerSourceBytes: numberValue(values, "max-bytes") }),
-        ...(numberValue(values, "max-total-bytes") === undefined ? {} : { maxTotalBytes: numberValue(values, "max-total-bytes") }),
+        ...(numberValue(values, "max-bytes") === undefined
+          ? {}
+          : { maxPerSourceBytes: numberValue(values, "max-bytes") }),
+        ...(numberValue(values, "max-total-bytes") === undefined
+          ? {}
+          : { maxTotalBytes: numberValue(values, "max-total-bytes") }),
       },
     );
     if (json) {
@@ -319,7 +444,13 @@ const modelsCommand: CliCommandSpec = {
   name: "models",
   summary: "List the models the configured endpoint offers.",
   options: [
-    { name: "query", alias: "q", type: "string", description: "Substring filter over model ids and names.", placeholder: "text" },
+    {
+      name: "query",
+      alias: "q",
+      type: "string",
+      description: "Substring filter over model ids and names.",
+      placeholder: "text",
+    },
     { name: "limit", type: "number", description: "Maximum results (default 100).", placeholder: "count" },
     { name: "vision", type: "boolean", description: "Only models that accept images." },
   ],
@@ -331,9 +462,16 @@ const modelsCommand: CliCommandSpec = {
       { query: stringValue(values, "query"), limit: numberValue(values, "limit") ?? 100 },
       { signal: AbortSignal.timeout(Math.min(config.timeoutMs, 30_000)) },
     );
-    const filtered = values["vision"] === true ? models.filter((model) => model.inputModalities?.includes("image")) : models;
+    const filtered =
+      values["vision"] === true ? models.filter((model) => model.inputModalities?.includes("image")) : models;
     if (json) {
-      out(JSON.stringify({ ok: true, endpoint: config.baseUrl, defaultModel: config.textModel ?? null, total, models: filtered }, null, 2));
+      out(
+        JSON.stringify(
+          { ok: true, endpoint: config.baseUrl, defaultModel: config.textModel ?? null, total, models: filtered },
+          null,
+          2,
+        ),
+      );
       return;
     }
     out(`endpoint: ${config.baseUrl}`);
@@ -369,13 +507,24 @@ await runCli({
     await runTxtServer({ log });
   },
   env: [
-    { name: "OPENAI_BASE_URL", description: "API root of any OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1", required: true },
-    { name: "OPENAI_API_KEY", description: "Bearer token. Optional for localhost endpoints unless DTST_ALLOW_NO_API_KEY=0.", required: true },
+    {
+      name: "OPENAI_BASE_URL",
+      description: "API root of any OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1",
+      required: true,
+    },
+    {
+      name: "OPENAI_API_KEY",
+      description: "Bearer token. Optional for localhost endpoints unless DTST_ALLOW_NO_API_KEY=0.",
+      required: true,
+    },
     { name: "OPENAI_MODEL", description: "Default text model for every call." },
     { name: "DTST_TXT_API", description: "chat (default) | responses — which API surface to use." },
     { name: "DTST_WORKSPACE", description: "Root for relative paths (default: process cwd)." },
     { name: "DTST_OUTPUT_DIR", description: "Default directory for saved results." },
-    { name: "DTST_ALLOWED_WRITE_ROOTS", description: "Colon-separated allow-list; when set, writes outside it are refused." },
+    {
+      name: "DTST_ALLOWED_WRITE_ROOTS",
+      description: "Colon-separated allow-list; when set, writes outside it are refused.",
+    },
     { name: "DTST_TIMEOUT_MS", description: "Per-request timeout in ms (default 600000)." },
     { name: "DTST_MAX_RETRIES", description: "Retries for 408/409/429/5xx (default 2)." },
     { name: "DTST_MAX_IMAGE_BYTES", description: "Largest accepted input image (default 26214400)." },
@@ -386,9 +535,17 @@ await runCli({
     { name: "DTST_ENV_FILE", description: "Explicit .env file to load instead of walking up from cwd." },
   ],
   defaults: [
-    { name: "text api", value: "chat", description: "Falls back to chat automatically if the endpoint rejects /responses." },
+    {
+      name: "text api",
+      value: "chat",
+      description: "Falls back to chat automatically if the endpoint rejects /responses.",
+    },
     { name: "verbosity", value: "balanced", description: "concise | balanced | detailed." },
     { name: "save", value: "false", description: "Text is returned inline unless a destination or --out is given." },
-    { name: "context budget", value: "256 KiB/source, 1 MiB total", description: "Raise with --max-bytes / --max-total-bytes." },
+    {
+      name: "context budget",
+      value: "256 KiB/source, 1 MiB total",
+      description: "Raise with --max-bytes / --max-total-bytes.",
+    },
   ],
 });

@@ -11,7 +11,9 @@ export const listImageModelsSchema = z.object({
   output_modalities: z
     .enum(["image", "any"])
     .optional()
-    .describe('"image" (default) returns models that emit images; "any" includes text models, which is useful when a chat-completions model produces images.'),
+    .describe(
+      '"image" (default) returns models that emit images; "any" includes text models, which is useful when a chat-completions model produces images.',
+    ),
 });
 
 export type ListImageModelsInput = z.infer<typeof listImageModelsSchema>;
@@ -33,12 +35,19 @@ export function registerListImageModelsTool(server: ServerLike, runtime: ToolRun
     async (input, context) => {
       const config = runtime.config();
       const limit = clampLimit(input.limit, 50);
-      const result = await listImageModels(config, { query: input.query, limit }, {
-        log: context.log,
-        signal: context.signal,
-        progress: context.progress,
-      });
-      const models = input.output_modalities === "any" ? result.models : result.models.filter((model) => model.outputModalities?.includes("image") ?? true);
+      const result = await listImageModels(
+        config,
+        { query: input.query, limit },
+        {
+          log: context.log,
+          signal: context.signal,
+          progress: context.progress,
+        },
+      );
+      const models =
+        input.output_modalities === "any"
+          ? result.models
+          : result.models.filter((model) => model.outputModalities?.includes("image") ?? true);
       const lines = models.map((model) => {
         const modalities = model.outputModalities?.length ? ` [${model.outputModalities.join("+")}]` : "";
         const providers =

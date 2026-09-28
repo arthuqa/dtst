@@ -25,14 +25,25 @@ describe("gatherContext: sources", () => {
   it("ingests inline text chunks", async () => {
     const result = await gatherContext({ text: ["hello"] });
     expect(result.chunks).toHaveLength(1);
-    expect(result.chunks[0]).toMatchObject({ source: "inline:0", label: "inline text #1", text: "hello", bytes: 5, truncated: false });
+    expect(result.chunks[0]).toMatchObject({
+      source: "inline:0",
+      label: "inline text #1",
+      text: "hello",
+      bytes: 5,
+      truncated: false,
+    });
     expect(result.totalBytes).toBe(5);
   });
 
   it("reads a file from disk", async () => {
     const result = await gatherContext({ files: [alpha] });
     expect(result.chunks).toHaveLength(1);
-    expect(result.chunks[0]).toMatchObject({ source: alpha, label: "alpha.txt", text: "hello alpha", truncated: false });
+    expect(result.chunks[0]).toMatchObject({
+      source: alpha,
+      label: "alpha.txt",
+      text: "hello alpha",
+      truncated: false,
+    });
   });
 
   it("expands a glob relative to the root", async () => {
@@ -85,10 +96,7 @@ describe("gatherContext: budgets", () => {
   });
 
   it("truncates once the total budget is exhausted", async () => {
-    const result = await gatherContext(
-      { text: ["x".repeat(100), "y".repeat(100)] },
-      { maxTotalBytes: 120 },
-    );
+    const result = await gatherContext({ text: ["x".repeat(100), "y".repeat(100)] }, { maxTotalBytes: 120 });
     expect(result.chunks).toHaveLength(2);
     expect(result.chunks[0]?.bytes).toBe(100);
     expect(result.chunks[0]?.truncated).toBe(false);
@@ -110,7 +118,9 @@ describe("gatherContext: artifacts", () => {
   it("reports an unknown artifact reference", async () => {
     const store = new ArtifactStore();
     const result = await gatherContext({ artifacts: ["dtst://artifact/deadbeef"] }, { artifacts: store });
-    expect(result.skipped).toEqual([{ source: "dtst://artifact/deadbeef", reason: "artifact not found in this session" }]);
+    expect(result.skipped).toEqual([
+      { source: "dtst://artifact/deadbeef", reason: "artifact not found in this session" },
+    ]);
   });
 });
 

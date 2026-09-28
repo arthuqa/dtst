@@ -5,7 +5,14 @@ import { ARTIFACT_URI_PREFIX, ArtifactStore, fileUri } from "@dtst/internal";
 describe("ArtifactStore", () => {
   it("saves, gets and lists artifacts", () => {
     const store = new ArtifactStore();
-    const first = store.save({ path: "/tmp/a.txt", kind: "text", bytes: 5, mimeType: "text/plain", label: "a.txt", text: "hello" });
+    const first = store.save({
+      path: "/tmp/a.txt",
+      kind: "text",
+      bytes: 5,
+      mimeType: "text/plain",
+      label: "a.txt",
+      text: "hello",
+    });
     const second = store.save({ path: "/tmp/b.png", kind: "image", bytes: 10 });
 
     expect(first.uri).toBe(`${ARTIFACT_URI_PREFIX}${first.id}`);

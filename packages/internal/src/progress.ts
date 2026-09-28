@@ -45,7 +45,11 @@ export function createProgress(extra: unknown, options: { minIntervalMs?: number
   let lastProgress = -1;
   let queue: Promise<void> = Promise.resolve();
 
-  const sendUpdate = async (progress: number, total: number | undefined, message: string | undefined): Promise<void> => {
+  const sendUpdate = async (
+    progress: number,
+    total: number | undefined,
+    message: string | undefined,
+  ): Promise<void> => {
     const params: Record<string, unknown> = { progressToken: token, progress };
     if (total !== undefined) params["total"] = total;
     if (message) params["message"] = message;

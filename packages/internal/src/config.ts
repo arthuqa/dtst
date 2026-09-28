@@ -120,7 +120,14 @@ function readJson(env: Record<string, string | undefined>, key: string): Record<
   }
 }
 
-const KNOWN_SUFFIXES = ["/chat/completions", "/completions", "/responses", "/images/generations", "/images/edits", "/images"];
+const KNOWN_SUFFIXES = [
+  "/chat/completions",
+  "/completions",
+  "/responses",
+  "/images/generations",
+  "/images/edits",
+  "/images",
+];
 
 /** Normalize a user-supplied base URL so it works with the OpenAI SDK. */
 export function normalizeBaseUrl(raw: string): string {
@@ -139,7 +146,10 @@ export function normalizeBaseUrl(raw: string): string {
   try {
     url = new URL(value);
   } catch {
-    throw invalidConfig(`OPENAI_BASE_URL is not a valid URL: ${JSON.stringify(raw)}`, "Example: https://openrouter.ai/api/v1");
+    throw invalidConfig(
+      `OPENAI_BASE_URL is not a valid URL: ${JSON.stringify(raw)}`,
+      "Example: https://openrouter.ai/api/v1",
+    );
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw invalidConfig(`OPENAI_BASE_URL must use http or https, got ${url.protocol}`);
@@ -162,8 +172,8 @@ export function isLocalHost(host: string): boolean {
     name === "0.0.0.0" ||
     name.endsWith(".local") ||
     name.endsWith(".localhost") ||
-    /^10\./.test(name) ||
-    /^192\.168\./.test(name) ||
+    name.startsWith("10.") ||
+    name.startsWith("192.168.") ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(name)
   );
 }
@@ -211,7 +221,9 @@ export function resolveConfig(options: ResolveOptions): ProviderConfig {
 
   const rawBackend = readString(env, "DTST_IMG_BACKEND")?.toLowerCase();
   if (rawBackend && !["auto", "images", "openrouter", "chat"].includes(rawBackend)) {
-    throw invalidConfig(`DTST_IMG_BACKEND must be one of auto|images|openrouter|chat, got ${JSON.stringify(rawBackend)}.`);
+    throw invalidConfig(
+      `DTST_IMG_BACKEND must be one of auto|images|openrouter|chat, got ${JSON.stringify(rawBackend)}.`,
+    );
   }
 
   const rawTextApi = readString(env, "DTST_TXT_API")?.toLowerCase();
@@ -228,7 +240,8 @@ export function resolveConfig(options: ResolveOptions): ProviderConfig {
     baseUrl,
     apiKey,
     timeoutMs: readInt(env, "DTST_TIMEOUT_MS", { min: 1_000 }) ?? options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS,
-    maxRetries: readInt(env, "DTST_MAX_RETRIES", { min: 0, max: 10 }) ?? options.defaultMaxRetries ?? DEFAULT_MAX_RETRIES,
+    maxRetries:
+      readInt(env, "DTST_MAX_RETRIES", { min: 0, max: 10 }) ?? options.defaultMaxRetries ?? DEFAULT_MAX_RETRIES,
     headers,
     extraBody: readJson(env, "DTST_EXTRA_BODY") ?? {},
     workspaceRoot: path.resolve(readString(env, "DTST_WORKSPACE") ?? cwd),

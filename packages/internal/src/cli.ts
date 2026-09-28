@@ -302,7 +302,10 @@ export function renderHelp(spec: CliSpec): string {
 }
 
 function renderCommandTable(spec: CliSpec): string[] {
-  const rows = [...spec.commands.map((command) => [command.name, command.summary] as const), ["serve", "Start the MCP stdio server."] as const];
+  const rows = [
+    ...spec.commands.map((command) => [command.name, command.summary] as const),
+    ["serve", "Start the MCP stdio server."] as const,
+  ];
   const width = Math.max(...rows.map(([name]) => name.length));
   return rows.map(([name, summary]) => `  ${name.padEnd(width)}  ${summary}`);
 }
@@ -312,7 +315,9 @@ function renderCommandList(spec: CliSpec): string {
 }
 
 export function renderCommandHelp(spec: CliSpec, command: CliCommandSpec): string {
-  const positionals = (command.positionals ?? []).map((entry) => (entry.required ? `<${entry.name}>` : `[${entry.name}]`));
+  const positionals = (command.positionals ?? []).map((entry) =>
+    entry.required ? `<${entry.name}>` : `[${entry.name}]`,
+  );
   const lines = [
     `Usage: ${spec.binName} ${command.name} ${positionals.join(" ")} [options]`.replace(/ +$/, ""),
     "",
@@ -323,7 +328,9 @@ export function renderCommandHelp(spec: CliSpec, command: CliCommandSpec): strin
   for (const option of [...GLOBAL_OPTIONS, ...(command.options ?? [])]) {
     const flag = `--${option.name}${option.alias ? `, -${option.alias}` : ""}`;
     const value = option.type === "boolean" ? "" : ` <${option.placeholder ?? option.type}>`;
-    lines.push(`  ${`${flag}${value}`.padEnd(34)} ${option.description}${option.required ? " (required)" : ""}${option.choices ? ` [${option.choices.join("|")}]` : ""}`);
+    lines.push(
+      `  ${`${flag}${value}`.padEnd(34)} ${option.description}${option.required ? " (required)" : ""}${option.choices ? ` [${option.choices.join("|")}]` : ""}`,
+    );
   }
   if (command.positionals && command.positionals.length > 0) {
     lines.push("", "Arguments:");

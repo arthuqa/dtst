@@ -52,8 +52,12 @@ export async function listModels(
       ...(model.context_length === undefined && model.context_window === undefined
         ? {}
         : { contextLength: model.context_length ?? model.context_window }),
-      ...(model.architecture?.input_modalities === undefined ? {} : { inputModalities: model.architecture.input_modalities }),
-      ...(model.architecture?.output_modalities === undefined ? {} : { outputModalities: model.architecture.output_modalities }),
+      ...(model.architecture?.input_modalities === undefined
+        ? {}
+        : { inputModalities: model.architecture.input_modalities }),
+      ...(model.architecture?.output_modalities === undefined
+        ? {}
+        : { outputModalities: model.architecture.output_modalities }),
       ...(model.pricing === undefined ? {} : { pricing: model.pricing }),
     }));
 
