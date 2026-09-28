@@ -94,8 +94,8 @@ only when these repository secrets exist:
 | --- | --- |
 | `OPENAI_BASE_URL` | API root for the integration run. |
 | `OPENAI_API_KEY` | Key used for the few real calls. |
-| `OPENAI_MODEL` | Model for the `txt` checks and the default for `img`. |
-| `DTST_IMAGE_MODEL` | Optional image-only model for the `img` checks. |
+| `OPENAI_MODEL` | Model for the `txt` checks and the image model for `img`. |
+| `DTST_TEST_IMAGE_MODEL` | Optional: image model for the `img` checks when it differs from `OPENAI_MODEL`. |
 
 Without them the job skips with a notice instead of failing.
 

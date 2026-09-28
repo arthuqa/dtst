@@ -36,15 +36,30 @@ export function redact(text: string): string {
   return out;
 }
 
-let level: LogLevel = normalizeLevel(process.env["DTST_LOG_LEVEL"]);
+let level: LogLevel = resolveLogLevel(process.env);
 
 export function normalizeLevel(value: string | undefined): LogLevel {
   const candidate = (value ?? "").trim().toLowerCase();
   return candidate in LEVEL_ORDER ? (candidate as LogLevel) : "warn";
 }
 
-export function setLogLevel(next: LogLevel | string | undefined): void {
-  level = normalizeLevel(typeof next === "string" ? next : undefined);
+/**
+ * Resolve the log level from the environment.
+ *
+ *   DTST_LOG_LEVEL=silent|error|warn|info|debug   (explicit, wins)
+ *   DEBUG=true                                    (idiomatic shorthand for debug)
+ */
+export function resolveLogLevel(env: Record<string, string | undefined> = process.env): LogLevel {
+  const explicit = env["DTST_LOG_LEVEL"];
+  if (explicit !== undefined && explicit.trim() !== "") return normalizeLevel(explicit);
+  const debug = (env["DEBUG"] ?? "").trim().toLowerCase();
+  if (debug !== "" && !["0", "false", "no", "off"].includes(debug)) return "debug";
+  return "warn";
+}
+
+/** Set the level explicitly; `undefined` re-derives it from the environment. */
+export function setLogLevel(next?: LogLevel | string | undefined): void {
+  level = next === undefined ? resolveLogLevel(process.env) : normalizeLevel(next);
 }
 
 export function getLogLevel(): LogLevel {

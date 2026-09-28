@@ -1,29 +1,30 @@
 /**
  * Configuration.
  *
- * The contract with the user is deliberately OpenAI-shaped so any compatible
- * endpoint works:
+ * Three variables configure everything, for both servers:
  *
  *   OPENAI_BASE_URL   e.g. https://openrouter.ai/api/v1   (required)
  *   OPENAI_API_KEY    bearer token                          (required, except for local endpoints)
- *   OPENAI_MODEL      model for text AND images             (required by each call)
+ *   OPENAI_MODEL      the model to use                      (required by each call)
  *
- * `OPENAI_MODEL` is the single model knob for both servers: @dtst/txt uses it
- * for chat, @dtst/img uses it as the default image model. When an endpoint
- * needs a different model for images (a text model and an image model cannot
- * be the same id), set `DTST_IMAGE_MODEL` — a namespaced *optional* override —
- * or pass `model` per tool call.
+ * `OPENAI_MODEL` is the single model knob: @dtst/txt uses it for chat and
+ * @dtst/img uses it for images. Each server has its own `env` block in an MCP
+ * client's config, so they can point at different models without any
+ * image-specific variable:
  *
- * Everything else is optional and namespaced under DTST_*. A `.env` file is
- * discovered from the working directory upwards (clients such as Claude
- * Desktop launch MCP servers without inheriting a shell environment).
+ *   "img": { "env": { "OPENAI_MODEL": "meta/muse-image" } }
+ *   "txt": { "env": { "OPENAI_MODEL": "openai/gpt-6-luna" } }
+ *
+ * A `.env` file is discovered from the working directory upwards (clients such
+ * as Claude Desktop launch MCP servers without inheriting a shell
+ * environment). `DEBUG=true` switches on verbose diagnostics.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 import { configError, invalidConfig } from "./errors";
-import { type LogLevel, getLogLevel, logger, normalizeLevel, registerSecret } from "./log";
+import { type LogLevel, logger, registerSecret, resolveLogLevel } from "./log";
 
 export type ImageBackendKind = "auto" | "images" | "openrouter" | "chat";
 export type TextApiKind = "chat" | "responses";
@@ -32,10 +33,8 @@ export interface ProviderConfig {
   /** Normalized base URL, no trailing slash, `/v1` guaranteed. */
   baseUrl: string;
   apiKey: string;
-  /** Default text model (`OPENAI_MODEL`). */
+  /** Default text model (`OPENAI_MODEL`); also the image model for @dtst/img. */
   textModel?: string;
-  /** Optional image-model override (`DTST_IMAGE_MODEL`); falls back to `textModel`. */
-  imageModel?: string;
   timeoutMs: number;
   maxRetries: number;
   /** Extra headers sent with every request. */
@@ -234,7 +233,7 @@ export function resolveConfig(options: ResolveOptions): ProviderConfig {
     extraBody: readJson(env, "DTST_EXTRA_BODY") ?? {},
     workspaceRoot: path.resolve(readString(env, "DTST_WORKSPACE") ?? cwd),
     allowedWriteRoots: allowedRoots.map((entry) => path.resolve(entry)),
-    logLevel: normalizeLevel(readString(env, "DTST_LOG_LEVEL") ?? getLogLevel()),
+    logLevel: resolveLogLevel(env),
     maxImageBytes: readInt(env, "DTST_MAX_IMAGE_BYTES", { min: 1024 }) ?? DEFAULT_MAX_IMAGE_BYTES,
     maxImages: readInt(env, "DTST_MAX_IMAGES", { min: 1, max: 64 }) ?? DEFAULT_MAX_IMAGES,
     imageBackend: (rawBackend as ImageBackendKind | undefined) ?? "auto",
@@ -246,9 +245,6 @@ export function resolveConfig(options: ResolveOptions): ProviderConfig {
 
   const textModel = readString(env, "OPENAI_MODEL", "DTST_MODEL");
   if (textModel) config.textModel = textModel;
-  // Optional: only needed when images come from a different model than text.
-  const imageModel = readString(env, "DTST_IMAGE_MODEL", "DTST_IMAGE_MODEL_ID");
-  if (imageModel) config.imageModel = imageModel;
   const outputDir = readString(env, "DTST_OUTPUT_DIR");
   if (outputDir) config.outputDir = outputDir;
 
@@ -314,8 +310,8 @@ export function configSummary(config: ProviderConfig): Record<string, unknown> {
   return {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey ? "set" : config.allowNoApiKey ? "not required for this endpoint" : "missing",
-    textModel: config.textModel ?? null,
-    imageModel: config.imageModel ?? config.textModel ?? null,
+    // The one model knob, used for text and images alike.
+    model: config.textModel ?? null,
     textApi: config.textApi,
     imageBackend: config.imageBackend,
     timeoutMs: config.timeoutMs,

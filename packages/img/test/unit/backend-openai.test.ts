@@ -109,10 +109,10 @@ describe("OpenAIImagesBackend.generate", () => {
     });
   });
 
-  it("requires an image model", async () => {
+  it("requires OPENAI_MODEL", async () => {
     const { client } = makeImagesClient();
     const backend = new OpenAIImagesBackend(client);
-    const config = testConfig({ imageModel: undefined });
+    const config = testConfig({ textModel: undefined });
     await expect(backend.generate({ prompt: "a cat", n: 1 }, makeContext(config))).rejects.toMatchObject({
       code: "CONFIG_MISSING",
     });

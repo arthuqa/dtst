@@ -79,7 +79,7 @@ export function testConfig(overrides: Partial<ProviderConfig> = {}): ProviderCon
   return {
     baseUrl: "https://api.test/v1",
     apiKey: "test-key-0123456789",
-    imageModel: "test-image-model",
+    textModel: "test-image-model",
     timeoutMs: 5_000,
     maxRetries: 0,
     headers: {},

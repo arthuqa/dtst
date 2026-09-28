@@ -111,6 +111,7 @@ collision-safe; `DTST_ALLOWED_WRITE_ROOTS` can confine them.
 | `DTST_TIMEOUT_MS` / `DTST_MAX_RETRIES` | 600000 / 2 | Request timeout and retry policy (`Retry-After` aware). |
 | `DTST_EXTRA_HEADERS` / `DTST_EXTRA_BODY` | – | JSON merged into every request. |
 | `DTST_LOG_LEVEL` | `warn` | stderr only — stdout is the MCP JSON-RPC channel. |
+| `DEBUG` | – | `true` is shorthand for `DTST_LOG_LEVEL=debug`. |
 | `DTST_ENV_FILE` | – | Explicit `.env` path. |
 
 ## CLI

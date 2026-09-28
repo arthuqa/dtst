@@ -16,7 +16,7 @@ describe("withImageModelHint", () => {
     expect(rewritten.status).toBe(404);
     expect(rewritten.message).toBe(original.message);
     expect(rewritten.hint).toContain("gpt-6-luna");
-    expect(rewritten.hint).toContain("DTST_IMAGE_MODEL");
+    expect(rewritten.hint).toContain("OPENAI_MODEL");
   });
 
   it("handles the 'output modalities' rejection", () => {

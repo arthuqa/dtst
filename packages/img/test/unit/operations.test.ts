@@ -50,7 +50,7 @@ function makeContext(): OperationContext {
     config: testConfig({
       workspaceRoot: dir,
       imageBackend: "images",
-      imageModel: "gpt-image-1",
+      textModel: "gpt-image-1",
       maxRetries: 0,
     }),
     log: silentLogger(),

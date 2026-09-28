@@ -12,7 +12,7 @@ export const modelField = z
   .min(1)
   .optional()
   .describe(
-    "Image model id. Defaults to DTST_IMAGE_MODEL, else OPENAI_MODEL. Examples: meta/muse-image, google/gemini-3.1-flash-image, openai/gpt-image-1, dall-e-3.",
+    "Image model id. Defaults to OPENAI_MODEL; pass this to use a different model for one call. Examples: meta/muse-image, google/gemini-3.1-flash-image, openai/gpt-image-1, dall-e-3.",
   );
 
 export const nField = z

@@ -11,8 +11,8 @@ export const imgErrors = {
     badInput("`prompt` must not be empty.", 'Describe the image, e.g. "a red panda astronaut, studio light".'),
 
   missingModel: (): DtstError =>
-    new DtstError("CONFIG_MISSING", "No image model selected.", {
-      hint: "Pass `model`, or set OPENAI_MODEL (the shared model knob) — or DTST_IMAGE_MODEL when images come from a different model. Examples: meta/muse-image, google/gemini-3.1-flash-image, gpt-image-1.",
+    new DtstError("CONFIG_MISSING", "No image model configured.", {
+      hint: "Set OPENAI_MODEL in the server's environment (or a .env file), e.g. OPENAI_MODEL=meta/muse-image, google/gemini-3.1-flash-image or gpt-image-1. You can also pass `model` per call.",
     }),
 
   needsInputImages: (): DtstError =>
@@ -25,7 +25,7 @@ export const imgErrors = {
 
   textInsteadOfImage: (model: string, providerMessage?: string): DtstError =>
     new DtstError("PROVIDER_ERROR", `The model "${model}" returned text instead of an image.${providerMessage ? ` Provider said: ${providerMessage}` : ""}`, {
-      hint: "OPENAI_MODEL is probably a chat model. Pass an image `model` explicitly (see `list_image_models`) or set DTST_IMAGE_MODEL.",
+      hint: `OPENAI_MODEL=${model} does not produce images. Point this server at an image model (e.g. "OPENAI_MODEL": "meta/muse-image" in its env block) or pass an image \`model\` explicitly — see \`list_image_models\`.`,
     }),
 
   maskUnsupported: (backend: BackendKind): DtstError =>
@@ -64,7 +64,7 @@ export function withImageModelHint(error: unknown, model: string | undefined): D
     retryable: dtst.retryable,
     ...(dtst.details === undefined ? {} : { details: dtst.details }),
     cause: dtst.cause,
-    hint: `If OPENAI_MODEL points at a chat model, ${label} cannot generate images: pass an image \`model\` (see \`list_image_models\`) or set DTST_IMAGE_MODEL.`,
+    hint: `This server generates images with OPENAI_MODEL, currently ${label}. If that is a chat model, set OPENAI_MODEL to an image model in this server's env block (see \`list_image_models\`) or pass an image \`model\` on the call.`,
   });
 }
 

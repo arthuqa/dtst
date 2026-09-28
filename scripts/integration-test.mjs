@@ -62,15 +62,17 @@ async function connect(pkg) {
 }
 
 /**
- * `OPENAI_MODEL` is the single model knob for both servers, so a test run that
- * wants one model for text and another for images must use the product's
- * override (`DTST_IMAGE_MODEL`). `OPENAI_IMAGE_MODEL` is accepted here purely
- * as a test-time convenience and is never read by the servers themselves.
+ * Both servers read the same variable, `OPENAI_MODEL`. An MCP client points
+ * them at different models through their separate env blocks, and this harness
+ * does the same for the test run: the image model comes from
+ * `DTST_TEST_IMAGE_MODEL` (falling back to `OPENAI_IMAGE_MODEL`, then
+ * `OPENAI_MODEL`) and is only ever applied to the img server's environment.
  */
 function integrationEnv(pkg) {
   const env = { ...process.env };
-  if (pkg === "img" && !env.DTST_IMAGE_MODEL && env.OPENAI_IMAGE_MODEL) {
-    env.DTST_IMAGE_MODEL = env.OPENAI_IMAGE_MODEL;
+  if (pkg === "img") {
+    const imageModel = process.env.DTST_TEST_IMAGE_MODEL ?? process.env.OPENAI_IMAGE_MODEL ?? process.env.OPENAI_MODEL;
+    if (imageModel) env.OPENAI_MODEL = imageModel;
   }
   return env;
 }

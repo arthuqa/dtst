@@ -150,7 +150,7 @@ function generationFields(values: CliValues): Omit<GenerateOperationInput, "prom
 }
 
 const SHARED_OPTIONS = [
-  { name: "model", alias: "m", type: "string" as const, description: "Image model id (default: DTST_IMAGE_MODEL, else OPENAI_MODEL).", placeholder: "model" },
+  { name: "model", alias: "m", type: "string" as const, description: "Image model for this call (default: OPENAI_MODEL).", placeholder: "model" },
   { name: "n", type: "number" as const, description: "How many images to produce (1-10).", placeholder: "count" },
   { name: "size", type: "string" as const, description: 'Explicit size ("1024x1024") or an OpenRouter tier ("2K").', placeholder: "size" },
   { name: "aspect-ratio", type: "string" as const, description: 'Aspect ratio such as "16:9".', placeholder: "ratio" },
@@ -311,8 +311,7 @@ await runCli({
   env: [
     { name: "OPENAI_BASE_URL", description: "API root of any OpenAI-compatible endpoint, e.g. https://openrouter.ai/api/v1", required: true },
     { name: "OPENAI_API_KEY", description: "Bearer token. Optional for localhost endpoints unless DTST_ALLOW_NO_API_KEY=0.", required: true },
-    { name: "OPENAI_MODEL", description: "Model used for images (and shared with @dtst/txt for text)." },
-    { name: "DTST_IMAGE_MODEL", description: "Optional override when images come from a different model than OPENAI_MODEL." },
+    { name: "OPENAI_MODEL", description: "The image model this server uses.", required: true },
     { name: "DTST_IMG_BACKEND", description: "auto (default) | images | openrouter | chat — force a wire protocol." },
     { name: "DTST_WORKSPACE", description: "Root for relative output paths (default: process cwd)." },
     { name: "DTST_OUTPUT_DIR", description: "Default directory for generated files." },
@@ -322,6 +321,7 @@ await runCli({
     { name: "DTST_EXTRA_HEADERS", description: "JSON object merged into every request (provider knobs)." },
     { name: "DTST_EXTRA_BODY", description: "JSON object merged into every request body." },
     { name: "DTST_LOG_LEVEL", description: "silent | error | warn | info | debug (default warn). stderr only." },
+    { name: "DEBUG", description: 'Set to "true" for verbose diagnostics on stderr (shorthand for DTST_LOG_LEVEL=debug).' },
     { name: "DTST_ENV_FILE", description: "Explicit .env file to load instead of walking up from cwd." },
   ],
   defaults: [
