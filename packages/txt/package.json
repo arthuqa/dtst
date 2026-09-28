@@ -47,7 +47,7 @@
     "test:unit": "vitest run test/unit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.1",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "dotenv": "^18.0.4",
     "openai": "^7.23.0",
     "tinyglobby": "^0.2.17",
@@ -56,7 +56,7 @@
   "devDependencies": {
     "@dtst/internal": "*",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
   }
 }
