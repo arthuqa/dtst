@@ -1,0 +1,62 @@
+{
+  "name": "@dtst/txt",
+  "version": "0.1.0",
+  "description": "MCP server and CLI for writing text and reasoning over context with any OpenAI-compatible API (OpenAI, OpenRouter, vLLM, Ollama, LiteLLM). Accepts multiple images and saves to agent-specified paths.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "text-generation",
+    "llm",
+    "openai",
+    "openrouter",
+    "vision",
+    "npx",
+    "agent"
+  ],
+  "license": "MIT",
+  "author": "dtst",
+  "type": "module",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "bin": {
+    "txt": "dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arthuqa/dtst.git",
+    "directory": "packages/txt"
+  },
+  "homepage": "https://github.com/arthuqa/dtst/tree/main/packages/txt#readme",
+  "bugs": "https://github.com/arthuqa/dtst/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup && node ../../scripts/check-bundle.mjs dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run test/unit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "dotenv": "^18.0.4",
+    "openai": "^7.23.0",
+    "tinyglobby": "^0.2.17",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@dtst/internal": "*",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

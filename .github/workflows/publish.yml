@@ -1,0 +1,197 @@
+name: Publish
+
+# Publishes @dtst/img and @dtst/txt to npm.
+#
+# Authentication, best first:
+#   1. npm Trusted Publishing (OIDC) — no secret needed. On npmjs.com open the
+#      package -> Settings -> Trusted Publisher -> GitHub Actions and enter:
+#        Organization: arthuqa   Repository: dtst
+#        Workflow filename: publish.yml
+#        Allowed actions: npm publish
+#      Requires npm CLI >= 11.5.1 (installed below) and `id-token: write`.
+#   2. NPM_TOKEN repository secret (granular automation token) as a fallback.
+#
+# Trigger by pushing a tag such as `img-v0.1.0` or `txt-v0.1.0`, or run the
+# workflow manually (which defaults to a dry run).
+
+on:
+  push:
+    tags:
+      - "img-v*"
+      - "txt-v*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Which package to publish
+        type: choice
+        options: [both, img, txt]
+        default: both
+      dry_run:
+        description: Pack and validate without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # OIDC trusted publishing + provenance attestations
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: resolve targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      dry_run: ${{ steps.select.outputs.dry_run }}
+      version: ${{ steps.select.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: select
+        name: Map the tag or dispatch input to a package list
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          dry_run="false"
+          version=""
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            case "$REF_NAME" in
+              img-v*) packages='["img"]'; version="${REF_NAME#img-v}" ;;
+              txt-v*) packages='["txt"]'; version="${REF_NAME#txt-v}" ;;
+              *) echo "::error::Unsupported tag $REF_NAME"; exit 1 ;;
+            esac
+          else
+            case "${INPUT_PACKAGE:-both}" in
+              img) packages='["img"]' ;;
+              txt) packages='["txt"]' ;;
+              *) packages='["img","txt"]' ;;
+            esac
+            dry_run="${INPUT_DRY_RUN:-true}"
+          fi
+
+          echo "matrix={\"package\":$packages}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Targets: $packages (dry_run=$dry_run, version=${version:-unspecified})"
+
+      - name: Fail fast when the tag does not match package.json
+        if: steps.select.outputs.version != ''
+        env:
+          VERSION: ${{ steps.select.outputs.version }}
+          MATRIX: ${{ steps.select.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          for pkg in $(printf '%s' "$MATRIX" | tr -d '[]"' | tr ',' ' '); do
+            declared=$(node -p "require('./packages/$pkg/package.json').version")
+            if [ "$declared" != "$VERSION" ]; then
+              echo "::error::Tag says $VERSION but packages/$pkg/package.json is $declared"
+              exit 1
+            fi
+            echo "packages/$pkg version $declared matches the tag"
+          done
+
+  verify:
+    name: verify before publish
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify tarballs
+        run: node scripts/verify-packages.mjs
+
+  publish:
+    name: publish ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    needs: [prepare, verify]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          # Never cache in release builds: a cached npm would miss the
+          # trusted-publishing capable CLI version below.
+          package-manager-cache: false
+
+      - name: Install (with a publishing-capable npm)
+        run: |
+          npm install -g npm@latest
+          npm --version
+          npm ci --no-audit --no-fund
+
+      - name: Build ${{ matrix.package }}
+        run: npm run build --workspace=@dtst/${{ matrix.package }}
+
+      - name: Determine authentication mode
+        id: auth
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing with the NPM_TOKEN secret."
+          else
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing with npm Trusted Publishing (OIDC)."
+          fi
+
+      - name: Publish (dry run)
+        if: needs.prepare.outputs.dry_run == 'true'
+        working-directory: packages/${{ matrix.package }}
+        run: npm publish --access public --dry-run
+
+      - name: Publish via OIDC
+        if: needs.prepare.outputs.dry_run != 'true' && steps.auth.outputs.mode == 'oidc'
+        working-directory: packages/${{ matrix.package }}
+        run: npm publish --access public
+
+      - name: Publish via NPM_TOKEN
+        if: needs.prepare.outputs.dry_run != 'true' && steps.auth.outputs.mode == 'token'
+        working-directory: packages/${{ matrix.package }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
+
+      - name: Summary
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          {
+            echo "### ${{ matrix.package }}"
+            echo ""
+            echo "- version: $(node -p "require('./package.json').version")"
+            echo "- dry run: ${{ needs.prepare.outputs.dry_run }}"
+            echo "- auth: ${{ steps.auth.outputs.mode }}"
+          } >> "$GITHUB_STEP_SUMMARY"
