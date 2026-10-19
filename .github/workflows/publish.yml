@@ -1,6 +1,6 @@
 name: Publish
 
-# Publishes @dtst/img and @dtst/txt to npm.
+# Publishes @dtst/img, @dtst/txt and @dtst/tts to npm.
 #
 # Authentication, best first:
 #   1. npm Trusted Publishing (OIDC) — no secret needed. On npmjs.com open the
@@ -11,7 +11,7 @@ name: Publish
 #      Requires npm CLI >= 11.5.1 (installed below) and `id-token: write`.
 #   2. NPM_TOKEN repository secret (granular automation token) as a fallback.
 #
-# Trigger by pushing a tag such as `img-v0.1.0` or `txt-v0.1.0`, or run the
+# Trigger by pushing a tag such as `img-v0.1.0`, `txt-v0.1.0` or `tts-v0.1.0`, or run the
 # workflow manually (which defaults to a dry run).
 
 on:
@@ -19,13 +19,14 @@ on:
     tags:
       - "img-v*"
       - "txt-v*"
+      - "tts-v*"
   workflow_dispatch:
     inputs:
       package:
         description: Which package to publish
         type: choice
-        options: [both, img, txt]
-        default: both
+        options: [all, img, txt, tts]
+        default: all
       dry_run:
         description: Pack and validate without publishing
         type: boolean
@@ -68,13 +69,15 @@ jobs:
             case "$REF_NAME" in
               img-v*) packages='["img"]'; version="${REF_NAME#img-v}" ;;
               txt-v*) packages='["txt"]'; version="${REF_NAME#txt-v}" ;;
+              tts-v*) packages='["tts"]'; version="${REF_NAME#tts-v}" ;;
               *) echo "::error::Unsupported tag $REF_NAME"; exit 1 ;;
             esac
           else
-            case "${INPUT_PACKAGE:-both}" in
+            case "${INPUT_PACKAGE:-all}" in
               img) packages='["img"]' ;;
               txt) packages='["txt"]' ;;
-              *) packages='["img","txt"]' ;;
+              tts) packages='["tts"]' ;;
+              *) packages='["img","txt","tts"]' ;;
             esac
             dry_run="${INPUT_DRY_RUN:-true}"
           fi

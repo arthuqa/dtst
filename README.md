@@ -1,15 +1,16 @@
 # dtst
 
-Two small MCP servers that work with any OpenAI-compatible API (OpenAI, OpenRouter, LiteLLM, vLLM, Ollama and others).
+Three small MCP servers that work with any OpenAI-compatible API (OpenAI, OpenRouter, LiteLLM, vLLM, Ollama and others).
 
 | Server          | Tools                                                 | Purpose                                                    |
 | --------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
 | **`@dtst/img`** | `generate_image` · `edit_image` · `list_image_models` | Create and edit images, saved to the path the agent picks. |
 | **`@dtst/txt`** | `generate_text` · `read_files` · `list_text_models`   | Hand writing tasks to a second model, grounded in files.   |
+| **`@dtst/tts`** | `generate_speech` · `list_speech_models`              | Turn text into speech, saved as mp3, wav and more.         |
 
 ## Quick start
 
-Add both servers to your MCP client:
+Add the servers to your MCP client:
 
 ```json
 {
@@ -20,7 +21,7 @@ Add both servers to your MCP client:
       "env": {
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENAI_API_KEY": "sk-...",
-        "OPENAI_IMAGE_MODEL": "meta/muse-image"
+        "OPENAI_MODEL": "meta/muse-image"
       }
     },
     "txt": {
@@ -30,6 +31,16 @@ Add both servers to your MCP client:
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENAI_API_KEY": "sk-...",
         "OPENAI_MODEL": "openai/gpt-6-luna"
+      }
+    },
+    "tts": {
+      "command": "npx",
+      "args": ["-y", "@dtst/tts"],
+      "env": {
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENAI_API_KEY": "sk-...",
+        "OPENAI_MODEL": "google/gemini-3.8-flash-lite-tts",
+        "OPENAI_VOICE": "Laomedeia"
       }
     }
   }
@@ -48,7 +59,7 @@ Add both servers to your MCP client:
 <summary><b>Claude Code · Codex · opencode</b></summary>
 
 ```bash
-claude mcp add img -e OPENAI_API_KEY=sk-... -e OPENAI_IMAGE_MODEL=openai/gpt-image-1 -- npx -y @dtst/img
+claude mcp add img -e OPENAI_API_KEY=sk-... -e OPENAI_MODEL=qwen/qwen-image-2.1-turbo -- npx -y @dtst/img
 ```
 
 ```toml
@@ -56,7 +67,7 @@ claude mcp add img -e OPENAI_API_KEY=sk-... -e OPENAI_IMAGE_MODEL=openai/gpt-ima
 [mcp_servers.img]
 command = "npx"
 args = ["-y", "@dtst/img"]
-env = { OPENAI_API_KEY = "sk-...", OPENAI_IMAGE_MODEL = "openai/gpt-image-1" }
+env = { OPENAI_API_KEY = "sk-...", OPENAI_MODEL = "bytedance-seed/seedream-5-0-flash" }
 ```
 
 ```json
@@ -72,18 +83,20 @@ env = { OPENAI_API_KEY = "sk-...", OPENAI_IMAGE_MODEL = "openai/gpt-image-1" }
 
 ## Configuration
 
-| Variable             | Default                     | Purpose                                              |
-| -------------------- | --------------------------- | ---------------------------------------------------- |
-| `OPENAI_BASE_URL`    | `https://api.openai.com/v1` | API root, used exactly as given                      |
-| `OPENAI_API_KEY`     | —                           | Required unless the endpoint is local or on your LAN |
-| `OPENAI_MODEL`       | —                           | Text model for `txt`; fallback image model for `img` |
-| `OPENAI_IMAGE_MODEL` | `OPENAI_MODEL`              | Image model for `img`                                |
-| `DTST_WORKSPACE`     | client root, else cwd       | Base folder for relative paths                       |
-| `DTST_IMAGE_API`     | `auto`                      | Force a protocol: `images`, `openrouter` or `chat`   |
-| `DTST_TIMEOUT_MS`    | `300000`                    | Timeout for each request                             |
-| `DEBUG`              | off                         | `1` turns on verbose logs (stderr)                   |
+| Variable              | Default                     | Purpose                                                   |
+| --------------------- | --------------------------- | --------------------------------------------------------- |
+| `OPENAI_BASE_URL`     | `https://api.openai.com/v1` | API root, used exactly as given                           |
+| `OPENAI_API_KEY`      | —                           | Required unless the endpoint is local or on your LAN      |
+| `OPENAI_MODEL`        | —                           | Text model for `txt`; fallback model for `img` and `tts`  |
+| `OPENAI_IMAGE_MODEL`  | `OPENAI_MODEL`              | Image model for `img`                                     |
+| `OPENAI_SPEECH_MODEL` | `OPENAI_MODEL`              | Speech model for `tts`                                    |
+| `OPENAI_VOICE`        | model's first listed voice  | Voice for `tts` (falls back to `alloy` if none is listed) |
+| `DTST_WORKSPACE`      | client root, else cwd       | Base folder for relative paths                            |
+| `DTST_IMAGE_API`      | `auto`                      | Force a protocol: `images`, `openrouter` or `chat`        |
+| `DTST_TIMEOUT_MS`     | `300000`                    | Timeout for each request                                  |
+| `DEBUG`               | off                         | `1` turns on verbose logs (stderr)                        |
 
-Both servers also read a `.env` file in their working directory. Since `img` and `txt` read separate model variables, one `.env` can configure both.
+Every server also reads a `.env` file in its working directory. Since `img`, `txt` and `tts` read separate model variables, one `.env` can configure all three.
 
 ## Tools
 
@@ -121,6 +134,22 @@ Both servers also read a `.env` file in their working directory. Since `img` and
 
 `list_text_models { query?, limit? }` shows context size, vision support and price.
 
+### `@dtst/tts`
+
+| `generate_speech`             | Description                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `text` or `file` **required** | What to say (read verbatim), or a text file / URL to read aloud                |
+| `voice` · `model`             | Override the configured voice or model for one call                            |
+| `instructions`                | Delivery direction: tone, pace, emotion, accent (models that support it)       |
+| `speed`                       | 0.25–4, where supported                                                        |
+| `format`                      | `mp3`, `wav`, `opus`, `aac`, `flac` or `pcm`; if omitted, taken from `output`  |
+| `output` · `overwrite`        | File (`audio/intro.mp3`) or folder (`audio/`) to save to                       |
+| `inline`                      | Also return the audio in the reply, for clients that play it (default `false`) |
+
+Speech goes through `/audio/speech`. When an endpoint only streams raw PCM (OpenRouter offers `mp3` or `pcm`), `wav` is built locally, and the duration is reported for `wav` and `pcm`.
+
+`list_speech_models { query?, limit? }` lists text-to-speech models and, when the provider publishes them, each model's voices (`query` matches voice names too).
+
 ## How files are saved
 
 - Relative paths are resolved against the workspace: `DTST_WORKSPACE`, otherwise the client's first [root](https://modelcontextprotocol.io/specification/2025-06-18/client/roots), otherwise the working directory.
@@ -135,7 +164,8 @@ Example agent flow:
 generate_image { "prompt": "red panda astronaut", "n": 2, "output": "art/" }
   → art/red-panda-astronaut-1.png, art/red-panda-astronaut-2.png
 edit_image     { "prompt": "add a sunset", "images": ["art/red-panda-astronaut-1.png"], "output": "art/final.webp" }
-generate_text  { "prompt": "Write alt text for this image", "files": ["art/final.webp"] }
+generate_text  { "prompt": "Write alt text for this image", "files": ["art/final.webp"], "output": "art/alt.md" }
+generate_speech { "file": "art/alt.md", "output": "art/alt.mp3" }
 ```
 
 ## Development
@@ -143,9 +173,9 @@ generate_text  { "prompt": "Write alt text for this image", "files": ["art/final
 ```bash
 npm install
 npm run check              # lint · format · typecheck · unit tests · build · package verification
-npm run test:integration   # live calls via .env (costs a few cents); add `img` or `txt` to run one server
+npm run test:integration   # live calls via .env (costs a few cents); add `img`, `txt` or `tts` to run one server
 ```
 
-Releases: `npm run release -- <img|txt|both> <patch|minor|major> --push` tags the release, and `.github/workflows/publish.yml` publishes it, via npm trusted publishing or an `NPM_TOKEN` secret.
+Releases: `npm run release -- <img|txt|tts|all> <patch|minor|major> --push` tags the release, and `.github/workflows/publish.yml` publishes it, via npm trusted publishing or an `NPM_TOKEN` secret.
 
 MIT licensed.

@@ -14,9 +14,37 @@ export interface ApiRequest {
 }
 
 export async function api<T>(config: Config, endpoint: string, request: ApiRequest = {}): Promise<T> {
+  return send(config, endpoint, request, "application/json", (_body, data) => data as T);
+}
+
+export interface BinaryResponse {
+  data: Buffer;
+  /** Full Content-Type header, parameters included (e.g. `audio/pcm;rate=24000`). */
+  contentType: string;
+}
+
+/** Like `api`, for endpoints that answer with raw bytes (e.g. `/audio/speech`); JSON bodies are treated as errors. */
+export async function apiBinary(config: Config, endpoint: string, request: ApiRequest = {}): Promise<BinaryResponse> {
+  return send(config, endpoint, request, "*/*", (body, data, contentType) => {
+    if (data !== undefined || /json/i.test(contentType)) {
+      throw new DtstError("PROVIDER", `Expected binary data, got JSON: ${errorMessage(data, body.toString("utf8"))}`);
+    }
+    if (body.length === 0) throw new DtstError("PROVIDER", "The provider returned an empty body.");
+    return { data: body, contentType };
+  });
+}
+
+/** Shared request loop: auth, timeout, cancellation, error mapping and retries. */
+async function send<T>(
+  config: Config,
+  endpoint: string,
+  request: ApiRequest,
+  accept: string,
+  read: (body: Buffer, data: unknown, contentType: string) => T,
+): Promise<T> {
   const url = `${config.baseUrl}${endpoint}`;
   const retries = request.retries ?? 2;
-  const headers: Record<string, string> = { accept: "application/json", ...config.headers };
+  const headers: Record<string, string> = { accept, ...config.headers };
   if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
   if (request.json !== undefined) headers["content-type"] = "application/json";
   const body = request.form ?? (request.json === undefined ? undefined : JSON.stringify(request.json));
@@ -27,11 +55,13 @@ export async function api<T>(config: Config, endpoint: string, request: ApiReque
     try {
       const signal = withTimeout(request.signal, config.timeoutMs);
       const response = await fetch(url, { method, headers, body, signal });
-      const text = await response.text();
-      const data = parseJson(text);
+      const raw = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get("content-type") ?? "";
+      const text = raw.toString("utf8");
+      const data = isBinary(contentType) ? undefined : parseJson(text);
       // Some gateways (OpenRouter included) report failures inside a 200 body.
       const embedded = (data as { error?: { code?: unknown } } | undefined)?.error;
-      if (response.ok && !embedded) return data as T;
+      if (response.ok && !embedded) return read(raw, data, contentType);
       const status = response.ok ? (typeof embedded?.code === "number" ? embedded.code : 502) : response.status;
       error = httpError(status, errorMessage(data, text), retryAfter(response.headers.get("retry-after")));
     } catch (caught) {
@@ -43,6 +73,11 @@ export async function api<T>(config: Config, endpoint: string, request: ApiReque
     log.debug(`retrying ${method} ${endpoint} in ${delay}ms`, error.message);
     await sleep(delay, request.signal);
   }
+}
+
+/** Audio, image, video and octet-stream bodies are never parsed as JSON. */
+function isBinary(contentType: string): boolean {
+  return /^(audio|image|video)\/|^application\/octet-stream/i.test(contentType.trim());
 }
 
 /** Download a URL with a byte cap; `truncate` keeps the first `maxBytes` instead of failing. */

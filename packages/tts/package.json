@@ -1,0 +1,56 @@
+{
+  "name": "@dtst/tts",
+  "version": "0.0.0",
+  "description": "MCP server for text-to-speech through any OpenAI-compatible API (OpenAI, OpenRouter, LiteLLM, local). Saves audio to the paths the agent asks for.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "text-to-speech",
+    "tts",
+    "speech",
+    "audio",
+    "openai",
+    "openrouter",
+    "agent"
+  ],
+  "license": "MIT",
+  "author": "dtst",
+  "type": "module",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "bin": {
+    "dtst-tts": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arthuqa/dtst.git",
+    "directory": "packages/tts"
+  },
+  "homepage": "https://github.com/arthuqa/dtst/tree/main/packages/tts#readme",
+  "bugs": "https://github.com/arthuqa/dtst/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup && node ../../scripts/check-bundle.mjs dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "tinyglobby": "^0.2.17",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@dtst/internal": "*",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}

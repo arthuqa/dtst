@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readConfig } from "../src/config";
 import { DtstError, httpError, toDtstError } from "../src/errors";
-import { api, download } from "../src/http";
+import { api, apiBinary, download } from "../src/http";
 import { type FakeProvider, fakeProvider } from "./helpers";
 
 let provider: FakeProvider;
@@ -46,6 +46,23 @@ describe("api", () => {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 20);
     await expect(api(config(), "/models", { signal: controller.signal })).rejects.toMatchObject({ code: "CANCELLED" });
+  });
+});
+
+describe("apiBinary", () => {
+  it("returns bytes and the content type, and treats JSON bodies as errors", async () => {
+    provider.on("POST /audio/speech", {
+      body: Buffer.from([1, 2, 3]),
+      headers: { "content-type": "audio/pcm;rate=24000" },
+    });
+    const result = await apiBinary(config(), "/audio/speech", { json: { input: "hi" } });
+    expect(result).toEqual({ data: Buffer.from([1, 2, 3]), contentType: "audio/pcm;rate=24000" });
+    expect(provider.requests[0]?.headers["accept"]).toBe("*/*");
+
+    provider.on("POST /audio/speech", { json: { error: { code: 402, message: "Insufficient credits" } } });
+    await expect(apiBinary(config(), "/audio/speech", { json: {} })).rejects.toMatchObject({ code: "CREDITS" });
+    provider.on("POST /audio/speech", { json: { ok: true } });
+    await expect(apiBinary(config(), "/audio/speech", { json: {} })).rejects.toMatchObject({ code: "PROVIDER" });
   });
 });
 

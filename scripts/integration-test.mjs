@@ -3,10 +3,10 @@
  * Live end-to-end test: spawns the built servers over stdio, drives every tool with the
  * official MCP client and makes REAL provider calls (costs a few cents).
  *
- *   npm run build && npm run test:integration [img|txt]
+ *   npm run build && npm run test:integration [img|txt|tts]
  *
- * Uses OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL / OPENAI_IMAGE_MODEL from the
- * environment or .env. Exit code: 0 all passed, 1 failures, 3 only blocked by provider credits.
+ * Uses OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL / OPENAI_IMAGE_MODEL /
+ * OPENAI_SPEECH_MODEL / OPENAI_VOICE from the environment or .env. Exit code: 0 all passed, 1 failures, 3 only blocked by provider credits.
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -288,6 +288,71 @@ async function testImg() {
   }
 }
 
+async function testTts() {
+  const speechModel = process.env.OPENAI_SPEECH_MODEL ?? process.env.OPENAI_MODEL ?? "";
+  console.log(`\n▶ dtst-tts · ${speechModel} · voice ${process.env.OPENAI_VOICE ?? "default"}`);
+  const client = await connect("tts");
+  try {
+    const tools = (await client.listTools()).tools.map((tool) => tool.name).sort();
+    check("tools", tools.join() === "generate_speech,list_speech_models", tools.join(", "));
+
+    let r = await call(client, "list_speech_models", { query: speechModel, limit: 3 });
+    check(
+      "list_speech_models finds the configured model",
+      !r.result.isError && r.text.split("\n").some((line) => line.startsWith(`- ${speechModel}`)),
+      r.text.split("\n")[2],
+    );
+
+    r = await call(client, "generate_speech", { text: "Hello from the dtst speech server.", output: "tts/hello.mp3" });
+    if (!blockedByCredits("generate_speech mp3", r)) {
+      const saved = r.result.structuredContent ?? {};
+      const bytes = saved.path && existsSync(saved.path) ? readFileSync(saved.path) : Buffer.alloc(0);
+      const mp3 =
+        bytes.subarray(0, 3).toString("latin1") === "ID3" || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
+      check(
+        "generate_speech saved an mp3",
+        !r.result.isError && saved.path?.endsWith("tts/hello.mp3") && mp3 && bytes.length > 1000,
+        `${saved.path ?? r.text.split("\n")[0]} · ${bytes.length} B · ${r.ms}ms`,
+      );
+      check(
+        "generate_speech resource link",
+        r.result.content.some((block) => block.type === "resource_link" && block.mimeType === "audio/mpeg"),
+      );
+    }
+
+    r = await call(client, "generate_speech", { file: "notes.md", output: "tts/notes.wav", inline: true });
+    if (!blockedByCredits("generate_speech wav from file", r)) {
+      const saved = r.result.structuredContent ?? {};
+      const bytes = saved.path && existsSync(saved.path) ? readFileSync(saved.path) : Buffer.alloc(0);
+      check(
+        "generate_speech wav from a file",
+        !r.result.isError &&
+          bytes.subarray(0, 4).toString("latin1") === "RIFF" &&
+          bytes.subarray(8, 12).toString("latin1") === "WAVE" &&
+          saved.duration_s > 2,
+        `${saved.path ?? r.text.split("\n")[0]} · ${saved.duration_s}s · ${r.ms}ms`,
+      );
+      check(
+        "generate_speech inline audio",
+        r.result.content.some((block) => block.type === "audio" && block.mimeType === "audio/wav"),
+      );
+    }
+
+    r = await call(client, "generate_speech", { text: "Hi", voice: "no-such-voice-xyz" });
+    if (!blockedByCredits("unknown voice", r)) {
+      check("unknown voice → actionable error", r.result.isError && /Hint: /.test(r.text), r.text.split("\n")[0]);
+    }
+
+    r = await call(client, "generate_speech", { text: "Hi", model: "nope/not-a-model" });
+    check("unknown model → error", r.result.isError && /^[A-Z_]+: /.test(r.text), r.text.split("\n")[0]);
+
+    r = await call(client, "generate_speech", { file: "missing.md" });
+    check("missing file → BAD_INPUT", r.result.isError && r.text.startsWith("BAD_INPUT"), r.text.split("\n")[0]);
+  } finally {
+    await client.close();
+  }
+}
+
 rmSync(WORK, { recursive: true, force: true });
 mkdirSync(WORK, { recursive: true });
 writeFileSync(
@@ -297,8 +362,9 @@ writeFileSync(
 writeFileSync(path.join(WORK, "red.png"), solidPng(64, [220, 20, 20]));
 
 const started = Date.now();
-if (only !== "img") await testTxt();
-if (only !== "txt") await testImg();
+if (!only || only === "txt") await testTxt();
+if (!only || only === "img") await testImg();
+if (!only || only === "tts") await testTts();
 console.log(
   `\n${tally.pass} passed · ${tally.fail} failed · ${tally.blocked} blocked · ${((Date.now() - started) / 1000).toFixed(1)}s · output in ${path.relative(ROOT, WORK)}/`,
 );

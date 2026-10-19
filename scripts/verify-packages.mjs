@@ -2,7 +2,7 @@
 /**
  * Pre-publish verification for the @dtst packages.
  *
- *   node scripts/verify-packages.mjs [--package img|txt] [--no-install]
+ *   node scripts/verify-packages.mjs [--package img|txt|tts] [--no-install]
  *
  * Three layers, cheapest first:
  *   1. static metadata checks against `npm pack --dry-run --json`
@@ -28,6 +28,7 @@ const skipInstall = args.includes("--no-install");
 const PACKAGES = [
   { dir: "packages/img", name: "@dtst/img", bin: "dtst-img" },
   { dir: "packages/txt", name: "@dtst/txt", bin: "dtst-txt" },
+  { dir: "packages/tts", name: "@dtst/tts", bin: "dtst-tts" },
 ].filter((entry) => !only || entry.name === only || entry.name === `@dtst/${only}`);
 
 const failures = [];

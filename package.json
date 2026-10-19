@@ -2,7 +2,7 @@
   "name": "dtst",
   "version": "0.0.0",
   "private": true,
-  "description": "Monorepo for the @dtst MCP servers (img, txt)",
+  "description": "Monorepo for the @dtst MCP servers (img, txt, tts)",
   "type": "module",
   "workspaces": [
     "packages/*"

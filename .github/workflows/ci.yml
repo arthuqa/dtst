@@ -89,6 +89,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
           OPENAI_IMAGE_MODEL: ${{ secrets.OPENAI_IMAGE_MODEL }}
+          OPENAI_SPEECH_MODEL: ${{ secrets.OPENAI_SPEECH_MODEL }}
+          OPENAI_VOICE: ${{ secrets.OPENAI_VOICE }}
         run: node scripts/integration-test.mjs
 
       - name: Upload integration artifacts

@@ -28,12 +28,16 @@ describe("readConfig", () => {
       OPENAI_API_KEY: "sk-or-123456",
       OPENAI_MODEL: "openai/gpt-6-luna",
       OPENAI_IMAGE_MODEL: "meta/muse-image",
+      OPENAI_SPEECH_MODEL: "google/gemini-3.8-flash-lite-tts",
+      OPENAI_VOICE: "Laomedeia",
       DTST_WORKSPACE: "~/work",
     });
     expect(config).toMatchObject({
       openRouter: true,
       textModel: "openai/gpt-6-luna",
       imageModel: "meta/muse-image",
+      speechModel: "google/gemini-3.8-flash-lite-tts",
+      voice: "Laomedeia",
       workspace: "~/work",
     });
     expect(config.headers["X-Title"]).toBe("dtst");

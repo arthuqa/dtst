@@ -1,4 +1,4 @@
-/** Private runtime shared by @dtst/img and @dtst/txt; inlined into each bundle by tsup. */
+/** Private runtime shared by @dtst/img, @dtst/txt and @dtst/tts; inlined into each bundle by tsup. */
 
 export * from "./config";
 export * from "./errors";

@@ -3,8 +3,10 @@
  *
  *   OPENAI_BASE_URL     API root, default https://api.openai.com/v1
  *   OPENAI_API_KEY      bearer token (optional for localhost / LAN endpoints)
- *   OPENAI_MODEL        default text model; image fallback
+ *   OPENAI_MODEL        default text model; image and speech fallback
  *   OPENAI_IMAGE_MODEL  default image model
+ *   OPENAI_SPEECH_MODEL default text-to-speech model
+ *   OPENAI_VOICE        default text-to-speech voice
  *   DTST_WORKSPACE      root for relative paths (default: client root, else cwd)
  *   DTST_IMAGE_API      auto | images | openrouter | chat
  *   DTST_TIMEOUT_MS     per-request timeout, default 300000
@@ -23,6 +25,8 @@ export interface Config {
   apiKey: string;
   textModel?: string;
   imageModel?: string;
+  speechModel?: string;
+  voice?: string;
   workspace?: string;
   imageApi: ImageApi;
   timeoutMs: number;
@@ -96,9 +100,13 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   };
   const textModel = read("OPENAI_MODEL");
   const imageModel = read("OPENAI_IMAGE_MODEL");
+  const speechModel = read("OPENAI_SPEECH_MODEL");
+  const voice = read("OPENAI_VOICE");
   const workspace = read("DTST_WORKSPACE");
   if (textModel) config.textModel = textModel;
   if (imageModel) config.imageModel = imageModel;
+  if (speechModel) config.speechModel = speechModel;
+  if (voice) config.voice = voice;
   if (workspace) config.workspace = workspace;
   return config;
 }

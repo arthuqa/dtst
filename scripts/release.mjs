@@ -4,9 +4,10 @@
  *
  *   node scripts/release.mjs img patch            # 0.1.0 -> 0.1.1 (commit + tag, no push)
  *   node scripts/release.mjs txt 1.0.0 --push     # explicit version, then push
- *   node scripts/release.mjs both minor --push --skip-checks
+ *   node scripts/release.mjs all minor --push --skip-checks
  *
- * One commit per run and one tag per package (`img-v0.1.1`, `txt-v1.0.0`).
+ * One commit per run and one tag per package (`img-v0.1.1`, `txt-v1.0.0`, `tts-v0.1.0`).
+ * `all` releases every package; `both` is kept as an alias for img + txt.
  * Tag pushes trigger .github/workflows/publish.yml.
  */
 
@@ -17,16 +18,17 @@ import process from "node:process";
 import readline from "node:readline";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
-const PACKAGES = { img: "packages/img", txt: "packages/txt" };
+const PACKAGES = { img: "packages/img", txt: "packages/txt", tts: "packages/tts" };
+const GROUPS = { all: Object.keys(PACKAGES), both: ["img", "txt"] };
 
 const args = process.argv.slice(2);
 const positional = args.filter((entry) => !entry.startsWith("--"));
 const flags = new Set(args.filter((entry) => entry.startsWith("--")));
 const [target, bump] = positional;
 
-if (!target || !bump || !(target in PACKAGES || target === "both")) {
+if (!target || !bump || !(target in PACKAGES || target in GROUPS)) {
   console.error(
-    "usage: node scripts/release.mjs <img|txt|both> <patch|minor|major|x.y.z> [--push] [--skip-checks] [--yes]",
+    "usage: node scripts/release.mjs <img|txt|tts|both|all> <patch|minor|major|x.y.z> [--push] [--skip-checks] [--yes]",
   );
   process.exit(2);
 }
@@ -69,7 +71,7 @@ if (branch !== "main" && !flags.has("--allow-branch")) {
   process.exit(1);
 }
 
-const targets = target === "both" ? Object.keys(PACKAGES) : [target];
+const targets = GROUPS[target] ?? [target];
 const planned = [];
 
 for (const name of targets) {
