@@ -158,6 +158,34 @@ describe("generate_speech", () => {
     expect(textOf(result)).toMatch(/^BAD_INPUT: Pass either/);
   });
 
+  it("gives format, option and voice hints for provider 400s (Fish Audio wording)", async () => {
+    const connected = await client();
+    const reject = (message: string): void =>
+      provider.on("POST /audio/speech", { status: 400, json: { error: { code: 400, message } } });
+
+    reject('unsupported response_format "flac" (supported: mp3, pcm, pcm16, wav, opus)');
+    let result = await callTool(connected, "generate_speech", { text: "Hi", format: "flac" });
+    expect(textOf(result)).toMatch(
+      /^BAD_INPUT: unsupported response_format[\s\S]*Hint: This endpoint does not offer flac; pick another `format`/,
+    );
+
+    reject("'instructions' is not supported by this gateway: Fish Audio has no instruction-following TTS");
+    result = await callTool(connected, "generate_speech", { text: "Hi", instructions: "calm" });
+    expect(textOf(result)).toMatch(
+      /^BAD_INPUT: [\s\S]*Hint: This endpoint does not support `instructions`; retry without it\./,
+    );
+
+    reject("Reference not found");
+    result = await callTool(connected, "generate_speech", { text: "Hi", voice: "ffff" });
+    expect(textOf(result)).toMatch(
+      /^BAD_INPUT: Reference not found\nHint: Voice "ffff" is not available for test\/tts-model/,
+    );
+
+    reject("Provider returned 400");
+    result = await callTool(connected, "generate_speech", { text: "Hi" });
+    expect(textOf(result)).toMatch(/^PROVIDER: Provider returned 400\nHint: Check that the model does text-to-speech/);
+  });
+
   it("requires a model", async () => {
     const result = await callTool(await client({ OPENAI_SPEECH_MODEL: "", OPENAI_MODEL: "" }), "generate_speech", {
       text: "Hi",

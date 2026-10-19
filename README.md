@@ -148,6 +148,8 @@ Every server also reads a `.env` file in its working directory. Since `img`, `tx
 
 Speech goes through `/audio/speech`. When an endpoint only streams raw PCM (OpenRouter offers `mp3` or `pcm`), `wav` is built locally, and the duration is reported for `wav` and `pcm`.
 
+Other OpenAI-compatible speech APIs work through `OPENAI_BASE_URL` too. For example, with [Fish Audio](https://docs.fish.audio) set `OPENAI_BASE_URL=https://api.fish.audio/compat/v1`, `OPENAI_SPEECH_MODEL=fish-audio/s2.1-pro` and `OPENAI_VOICE` to a voice id from its library. It offers `mp3`, `wav`, `opus` and `pcm`, and does not support `instructions`.
+
 `list_speech_models { query?, limit? }` lists text-to-speech models and, when the provider publishes them, each model's voices (`query` matches voice names too).
 
 ## How files are saved

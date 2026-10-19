@@ -264,7 +264,7 @@ export async function synthesize(config: Config, request: SpeechRequest): Promis
   try {
     response = await apiBinary(config, "/audio/speech", { json: body, signal: request.signal });
   } catch (error) {
-    throw explain(error, request);
+    throw explain(error, request, wire);
   }
   log.debug(`speech: ${response.data.length} bytes of ${response.contentType || "unknown type"}`);
 
@@ -289,21 +289,41 @@ function withDuration(data: Buffer, format: AudioFormat, layout?: PcmLayout): Sp
   return { data, format, ...(durationS === undefined ? {} : { durationS }) };
 }
 
-/** Add a pointer to the voice list when the provider rejects the voice or the model. */
-function explain(error: unknown, request: SpeechRequest): unknown {
+/** Turn a provider's 400 into an actionable error: unsupported format or option, unknown voice, or a generic hint. */
+function explain(error: unknown, request: SpeechRequest, wire: AudioFormat): unknown {
   if (!(error instanceof DtstError) || error.status !== 400) return error;
-  if (/voice|speaker/i.test(error.message)) {
+  const message = error.message;
+  const unsupported = /unsupported|not supported|invalid|expected one of|must be one of/i;
+  if (/response_format|\bformat\b/i.test(message) && unsupported.test(message)) {
     return new DtstError(
       "BAD_INPUT",
-      error.message,
-      `Voice "${request.voice}" is not available for ${request.model}; list_speech_models shows its voices.`,
+      message,
+      `This endpoint does not offer ${wire}; pick another \`format\` (mp3 is the most widely supported).`,
+      error.status,
+    );
+  }
+  const option = /\b(instructions|speed)\b/i.exec(message);
+  if (option && unsupported.test(message)) {
+    const name = option[1]!.toLowerCase();
+    return new DtstError(
+      "BAD_INPUT",
+      message,
+      `This endpoint does not support \`${name}\`; retry without it.`,
+      error.status,
+    );
+  }
+  if (/voice|speaker|reference/i.test(message)) {
+    return new DtstError(
+      "BAD_INPUT",
+      message,
+      `Voice "${request.voice}" is not available for ${request.model}. list_speech_models shows its voices when the provider publishes them; otherwise use a voice id from the provider's library.`,
       error.status,
     );
   }
   if (error.code === "PROVIDER" && !error.hint) {
     return new DtstError(
       "PROVIDER",
-      error.message,
+      message,
       "Check that the model does text-to-speech and the voice exists (list_speech_models).",
       error.status,
     );
