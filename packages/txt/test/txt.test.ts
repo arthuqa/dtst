@@ -153,6 +153,7 @@ describe("generate_text", () => {
         baseUrl: "https://api.openai.com/v1",
         apiKey: "k",
         imageApi: "auto",
+        speechApi: "auto",
         timeoutMs: 5000,
         headers: {},
         openRouter: false,

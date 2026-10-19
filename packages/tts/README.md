@@ -1,6 +1,6 @@
 # @dtst/tts
 
-MCP server that turns text into speech through any OpenAI-compatible API (`/audio/speech`). Every result is saved to the audio file or folder the agent chooses.
+MCP server that turns text into speech through any OpenAI-compatible API (`/audio/speech`), or Fish Audio's native API (all Fish models, including `drama-3` with multi-speaker scenes). Every result is saved to the audio file or folder the agent chooses.
 
 ```json
 {

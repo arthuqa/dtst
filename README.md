@@ -93,6 +93,7 @@ env = { OPENAI_API_KEY = "sk-...", OPENAI_MODEL = "bytedance-seed/seedream-5-0-f
 | `OPENAI_VOICE`        | model's first listed voice  | Voice for `tts` (falls back to `alloy` if none is listed) |
 | `DTST_WORKSPACE`      | client root, else cwd       | Base folder for relative paths                            |
 | `DTST_IMAGE_API`      | `auto`                      | Force a protocol: `images`, `openrouter` or `chat`        |
+| `DTST_SPEECH_API`     | `auto`                      | Force a speech protocol: `openai` or `fish`               |
 | `DTST_TIMEOUT_MS`     | `300000`                    | Timeout for each request                                  |
 | `DEBUG`               | off                         | `1` turns on verbose logs (stderr)                        |
 
@@ -148,7 +149,21 @@ Every server also reads a `.env` file in its working directory. Since `img`, `tx
 
 Speech goes through `/audio/speech`. When an endpoint only streams raw PCM (OpenRouter offers `mp3` or `pcm`), `wav` is built locally, and the duration is reported for `wav` and `pcm`.
 
-Other OpenAI-compatible speech APIs work through `OPENAI_BASE_URL` too. For example, with [Fish Audio](https://docs.fish.audio) set `OPENAI_BASE_URL=https://api.fish.audio/compat/v1`, `OPENAI_SPEECH_MODEL=fish-audio/s2.1-pro` and `OPENAI_VOICE` to a voice id from its library. It offers `mp3`, `wav`, `opus` and `pcm`, and does not support `instructions`.
+**Fish Audio.** With a `fish.audio` base URL (e.g. `OPENAI_BASE_URL=https://api.fish.audio`), `tts` uses Fish's native `POST /v1/tts`, so every Fish model works, including `drama-3`. `DTST_SPEECH_API=fish` forces this for other hosts (self-hosted Fish Speech).
+
+```json
+"env": {
+  "OPENAI_BASE_URL": "https://api.fish.audio",
+  "OPENAI_API_KEY": "<Fish Audio API key>",
+  "OPENAI_SPEECH_MODEL": "drama-3",
+  "OPENAI_VOICE": "c70cfb98867a4bfb9ae20d2401257b92"
+}
+```
+
+- `voice` is a voice id (from `list_speech_models`, which lists your voices and, with `query`, searches the public library). Without one, Fish picks its default voice.
+- Drama 3 directions are plain text: `[barely holding it together] I'm fine.`, `<whisper>…</whisper>`, `<french>…</french>`. `instructions` is added as a leading `[direction]`.
+- Multi-speaker: start each turn with `<|speaker:0|>`, `<|speaker:1|>`, … and pass one voice id per speaker, comma-separated: `"voice": "id0, id1"`.
+- Formats: `mp3`, `wav`, `opus`, `pcm`. Model ids may be bare (`drama-3`) or prefixed (`fish-audio/drama-3`). Fish quietly falls back to `s2.1-pro` for an unknown model id.
 
 `list_speech_models { query?, limit? }` lists text-to-speech models and, when the provider publishes them, each model's voices (`query` matches voice names too).
 

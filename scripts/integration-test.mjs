@@ -6,7 +6,8 @@
  *   npm run build && npm run test:integration [img|txt|tts]
  *
  * Uses OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL / OPENAI_IMAGE_MODEL /
- * OPENAI_SPEECH_MODEL / OPENAI_VOICE from the environment or .env. Exit code: 0 all passed, 1 failures, 3 only blocked by provider credits.
+ * OPENAI_SPEECH_MODEL / OPENAI_VOICE / DTST_SPEECH_API from the environment or .env.
+ * A Fish Audio base URL (api.fish.audio) runs the native /v1/tts checks, including drama-3. Exit code: 0 all passed, 1 failures, 3 only blocked by provider credits.
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -299,7 +300,12 @@ async function testTts() {
     let r = await call(client, "list_speech_models", { query: speechModel, limit: 3 });
     check(
       "list_speech_models finds the configured model",
-      !r.result.isError && r.text.split("\n").some((line) => line.startsWith(`- ${speechModel}`)),
+      !r.result.isError &&
+        r.text
+          .split("\n")
+          .some((line) =>
+            [speechModel, speechModel.replace(/^fish-audio\//, "")].some((id) => line.startsWith(`- ${id} `)),
+          ),
       r.text.split("\n")[2],
     );
 
@@ -343,8 +349,52 @@ async function testTts() {
       check("unknown voice → actionable error", r.result.isError && /Hint: /.test(r.text), r.text.split("\n")[0]);
     }
 
-    r = await call(client, "generate_speech", { text: "Hi", model: "nope/not-a-model" });
-    check("unknown model → error", r.result.isError && /^[A-Z_]+: /.test(r.text), r.text.split("\n")[0]);
+    const fish =
+      process.env.DTST_SPEECH_API === "fish" ||
+      ((process.env.DTST_SPEECH_API ?? "auto") === "auto" &&
+        /(^|\.)fish\.audio$/.test(new URL(process.env.OPENAI_BASE_URL ?? "https://x").hostname));
+    if (fish) {
+      // Fish falls back to its default model for unknown ids, so exercise drama-3 features instead.
+      r = await call(client, "generate_speech", {
+        model: "drama-3",
+        text: "<|speaker:0|>[low, tired] Status report.<|speaker:1|>[nervous] It is, uh, <emphasis>not</emphasis> great.",
+        voice: "bf322df2096a46f18c579d0baa36f41d, f3a2b90078d54a65af4b95f63bc7798e",
+        output: "tts/scene.mp3",
+      });
+      const scene = r.result.structuredContent ?? {};
+      check(
+        "drama-3 multi-speaker scene",
+        !r.result.isError && scene.path && existsSync(scene.path) && scene.bytes > 5000,
+        `${scene.path ?? r.text.split("\n")[0]} · ${scene.bytes} B · ${r.ms}ms`,
+      );
+
+      r = await call(client, "generate_speech", {
+        model: "drama-3",
+        text: "I'm fine. Really. <whisper>Go on without me.</whisper>",
+        instructions: "barely holding it together, forcing a smile",
+        format: "wav",
+        output: "tts/direction.wav",
+      });
+      const directed = r.result.structuredContent ?? {};
+      check(
+        "drama-3 with instructions → wav",
+        !r.result.isError && directed.mime_type === "audio/wav" && directed.duration_s > 1,
+        `${directed.path ?? r.text.split("\n")[0]} · ${directed.duration_s}s`,
+      );
+
+      r = await call(client, "list_speech_models", { query: "Delia" });
+      check(
+        "list_speech_models lists your voices and library matches",
+        r.text.includes("Your voices (") && /Library voices matching "Delia" \([1-9]/.test(r.text),
+        r.text
+          .split("\n")
+          .filter((line) => /voices/i.test(line))
+          .join(" | "),
+      );
+    } else {
+      r = await call(client, "generate_speech", { text: "Hi", model: "nope/not-a-model" });
+      check("unknown model → error", r.result.isError && /^[A-Z_]+: /.test(r.text), r.text.split("\n")[0]);
+    }
 
     r = await call(client, "generate_speech", { file: "missing.md" });
     check("missing file → BAD_INPUT", r.result.isError && r.text.startsWith("BAD_INPUT"), r.text.split("\n")[0]);

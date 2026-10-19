@@ -8,6 +8,8 @@ export interface ApiRequest {
   method?: "GET" | "POST";
   json?: unknown;
   form?: FormData;
+  /** Extra request headers (e.g. Fish Audio's `model`). */
+  headers?: Record<string, string>;
   signal?: AbortSignal | undefined;
   /** Retries for 429 / 5xx / network errors. Default 2. */
   retries?: number;
@@ -44,7 +46,7 @@ async function send<T>(
 ): Promise<T> {
   const url = `${config.baseUrl}${endpoint}`;
   const retries = request.retries ?? 2;
-  const headers: Record<string, string> = { accept, ...config.headers };
+  const headers: Record<string, string> = { accept, ...config.headers, ...request.headers };
   if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
   if (request.json !== undefined) headers["content-type"] = "application/json";
   const body = request.form ?? (request.json === undefined ? undefined : JSON.stringify(request.json));

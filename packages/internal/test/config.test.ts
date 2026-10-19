@@ -8,6 +8,7 @@ describe("readConfig", () => {
     expect(config).toMatchObject({
       baseUrl: DEFAULT_BASE_URL,
       imageApi: "auto",
+      speechApi: "auto",
       timeoutMs: 300_000,
       openRouter: false,
     });
@@ -30,6 +31,7 @@ describe("readConfig", () => {
       OPENAI_IMAGE_MODEL: "meta/muse-image",
       OPENAI_SPEECH_MODEL: "google/gemini-3.8-flash-lite-tts",
       OPENAI_VOICE: "Laomedeia",
+      DTST_SPEECH_API: "FISH",
       DTST_WORKSPACE: "~/work",
     });
     expect(config).toMatchObject({
@@ -38,6 +40,7 @@ describe("readConfig", () => {
       imageModel: "meta/muse-image",
       speechModel: "google/gemini-3.8-flash-lite-tts",
       voice: "Laomedeia",
+      speechApi: "fish",
       workspace: "~/work",
     });
     expect(config.headers["X-Title"]).toBe("dtst");
@@ -56,7 +59,12 @@ describe("readConfig", () => {
         return error;
       }
     };
-    for (const env of [{ OPENAI_BASE_URL: "not a url" }, { DTST_IMAGE_API: "magic" }, { DTST_TIMEOUT_MS: "5" }]) {
+    for (const env of [
+      { OPENAI_BASE_URL: "not a url" },
+      { DTST_IMAGE_API: "magic" },
+      { DTST_SPEECH_API: "magic" },
+      { DTST_TIMEOUT_MS: "5" },
+    ]) {
       const error = attempt(env);
       expect(error).toBeInstanceOf(DtstError);
       expect((error as DtstError).code).toBe("CONFIG");

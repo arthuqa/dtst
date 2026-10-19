@@ -14,6 +14,8 @@ import type { Server } from "../src/server";
 export interface RecordedRequest {
   method: string;
   path: string;
+  /** Query string without the leading `?` ("" when absent). */
+  query: string;
   headers: http.IncomingHttpHeaders;
   json?: any;
   form?: FormData;
@@ -37,8 +39,8 @@ export async function fakeProvider(): Promise<FakeProvider> {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     const raw = Buffer.concat(chunks);
-    const route = (req.url ?? "/").replace(/^\/v1/, "").split("?")[0];
-    const recorded: RecordedRequest = { method: req.method ?? "GET", path: route ?? "/", headers: req.headers };
+    const [route, query = ""] = (req.url ?? "/").replace(/^\/v1/, "").split("?");
+    const recorded: RecordedRequest = { method: req.method ?? "GET", path: route || "/", query, headers: req.headers };
     const type = req.headers["content-type"] ?? "";
     if (type.includes("application/json")) recorded.json = JSON.parse(raw.toString("utf8"));
     if (type.includes("multipart/form-data")) {

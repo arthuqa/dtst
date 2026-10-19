@@ -3,6 +3,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type FakeProvider, callTool, connect, fakeProvider, tempDir, textOf } from "../../internal/test/helpers";
 import { audioDuration, formatForExtension, pcmLayout, pcmToWav, sniffAudio } from "../src/audio";
+import { readConfig } from "../../internal/src/config";
+import { usesFishApi } from "../src/fish";
 import { createServer, synthesize } from "../src/server";
 
 let provider: FakeProvider;
@@ -95,6 +97,7 @@ describe("generate_speech", () => {
       baseUrl: provider.url,
       apiKey: "sk-test-123456",
       imageApi: "auto" as const,
+      speechApi: "auto" as const,
       timeoutMs: 5000,
       headers: {},
       openRouter: true,
@@ -244,5 +247,102 @@ describe("audio helpers", () => {
     expect(audioDuration(PCM_1S, "pcm", layout)).toBe(1);
     expect(audioDuration(pcmToWav(PCM_1S.subarray(0, 12_000), layout), "wav")).toBe(0.25);
     expect(audioDuration(MP3, "mp3")).toBeUndefined();
+  });
+});
+
+describe("Fish Audio native API", () => {
+  const VOICE = "c70cfb98867a4bfb9ae20d2401257b92";
+  const fish = (env: Record<string, string> = {}) =>
+    client({ DTST_SPEECH_API: "fish", OPENAI_SPEECH_MODEL: "fish-audio/drama-3", OPENAI_VOICE: VOICE, ...env });
+
+  it("is chosen automatically for fish.audio hosts", () => {
+    const config = (env: Record<string, string>) => readConfig({ OPENAI_API_KEY: "sk-test-123456", ...env });
+    expect(usesFishApi(config({ OPENAI_BASE_URL: "https://api.fish.audio/compat/v1" }))).toBe(true);
+    expect(usesFishApi(config({ OPENAI_BASE_URL: "https://api.fish.audio" }))).toBe(true);
+    expect(usesFishApi(config({ OPENAI_BASE_URL: "https://openrouter.ai/api/v1" }))).toBe(false);
+    expect(
+      usesFishApi(config({ OPENAI_BASE_URL: "https://api.fish.audio/compat/v1", DTST_SPEECH_API: "openai" })),
+    ).toBe(false);
+  });
+
+  it("posts /v1/tts with the model header, reference_id, direction and prosody", async () => {
+    provider.on("POST /tts", { body: MP3, headers: { "content-type": "audio/mpeg" } });
+    const result = await callTool(await fish(), "generate_speech", {
+      text: "I'm fine. <whisper>Go on without me.</whisper>",
+      instructions: "barely holding it together",
+      speed: 1.2,
+      output: "line.mp3",
+    });
+
+    expect(result.isError).toBeFalsy();
+    const request = provider.requests[0]!;
+    expect(request.path).toBe("/tts");
+    expect(request.headers["model"]).toBe("drama-3");
+    expect(request.json).toEqual({
+      text: "[barely holding it together] I'm fine. <whisper>Go on without me.</whisper>",
+      format: "mp3",
+      reference_id: VOICE,
+      prosody: { speed: 1.2 },
+    });
+    expect(result.structuredContent).toMatchObject({
+      model: "fish-audio/drama-3",
+      voice: VOICE,
+      mime_type: "audio/mpeg",
+    });
+  });
+
+  it("sends one reference per speaker and lets Fish pick the voice when none is set", async () => {
+    provider.on("POST /tts", { body: MP3, headers: { "content-type": "audio/mpeg" } });
+    const script = "<|speaker:0|>Status report.<|speaker:1|>It is not great.";
+    const connected = await fish({ OPENAI_VOICE: "" });
+    await callTool(connected, "generate_speech", { text: script, voice: "aaa, bbb" });
+    expect(provider.requests[0]?.json.reference_id).toEqual(["aaa", "bbb"]);
+
+    const result = await callTool(connected, "generate_speech", { text: "Hello" });
+    expect(provider.requests[1]?.json).not.toHaveProperty("reference_id");
+    expect(result.structuredContent).not.toHaveProperty("voice");
+    expect(provider.requests.some((entry) => entry.path === "/models")).toBe(false);
+
+    const rejected = await callTool(connected, "generate_speech", { text: script, instructions: "calm" });
+    expect(textOf(rejected)).toMatch(/^BAD_INPUT: `instructions` cannot apply to a multi-speaker script/);
+  });
+
+  it("builds WAV from 44.1 kHz PCM and rejects formats Fish lacks", async () => {
+    provider.on("POST /tts", { body: Buffer.alloc(88_200), headers: { "content-type": "audio/pcm" } });
+    const connected = await fish();
+    const result = await callTool(connected, "generate_speech", { text: "Hi", output: "hi.wav" });
+    expect(provider.requests[0]?.json).toMatchObject({ format: "pcm", sample_rate: 44_100 });
+    const saved = result.structuredContent as Record<string, unknown>;
+    expect(saved).toMatchObject({ mime_type: "audio/wav", duration_s: 1 });
+    expect(readFileSync(saved["path"] as string).readUInt32LE(24)).toBe(44_100);
+
+    const flac = await callTool(connected, "generate_speech", { text: "Hi", format: "flac" });
+    expect(textOf(flac)).toMatch(/^UNSUPPORTED: Fish Audio returns mp3, wav, opus or pcm, not flac/);
+  });
+
+  it("lists the Fish catalog, your voices and library matches", async () => {
+    provider.on("GET /model", ({ query }) => ({
+      json: {
+        items: query.includes("self=true")
+          ? [{ _id: "own1", title: "My narrator", languages: ["en"], type: "tts", state: "trained" }]
+          : [
+              { _id: "lib1", title: "Delia", languages: ["en"], type: "tts", state: "trained" },
+              { _id: "lib2", title: "Delia draft", type: "tts", state: "training" },
+            ],
+      },
+    }));
+    const connected = await fish();
+    const result = await callTool(connected, "list_speech_models", { query: "delia" });
+    const output = textOf(result);
+    expect(output).toContain("Default model: fish-audio/drama-3");
+    expect(output).toContain("Your voices (1):\n- own1 · My narrator (en)");
+    expect(output).toContain('Library voices matching "delia" (1):\n- lib1 · Delia (en)');
+
+    expect(provider.requests.find((entry) => entry.query.startsWith("title="))?.query).toBe(
+      "title=delia&page_size=10&sort_by=score",
+    );
+    const all = textOf(await callTool(connected, "list_speech_models", {}));
+    expect(all).toContain("5 of 5 models:\n- drama-3 (Drama 3");
+    expect(all).toContain("Pass `query` to search the public voice library");
   });
 });

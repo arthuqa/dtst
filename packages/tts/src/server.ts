@@ -17,6 +17,15 @@ import {
 import type { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
+  FISH_MODELS,
+  type FishVoice,
+  fishDefaultModel,
+  fishModel,
+  fishRequest,
+  listFishVoices,
+  usesFishApi,
+} from "./fish";
+import {
   AUDIO_FORMATS,
   type AudioFormat,
   type PcmLayout,
@@ -36,7 +45,8 @@ const INSTRUCTIONS = `Text-to-speech; every result is saved to an audio file.
 - generate_speech: \`text\` (or a text \`file\`) → spoken audio, read verbatim.
 - Pass \`output\` when the user names a file or folder; otherwise files land in the workspace root.
 - \`instructions\` steers tone, pace, emotion or accent on models that support it.
-- Unsure about a model id or its voices? Call list_speech_models.`;
+- Unsure about a model id or its voices? Call list_speech_models.
+- On Fish Audio, \`voice\` is a voice id; for a multi-speaker script (<|speaker:0|>…<|speaker:1|>…) pass one id per speaker, comma-separated.`;
 
 /** OpenAI's default voice, used when nothing is configured and the endpoint does not list voices. */
 const FALLBACK_VOICE = "alloy";
@@ -69,7 +79,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
           .describe(
             defaultVoice
               ? `Omit to use the configured voice (${defaultVoice}). Set only if the user asks for a different voice.`
-              : "Voice name; voices differ per model (see list_speech_models).",
+              : "Voice name or id; voices differ per model (see list_speech_models). Fish Audio: comma-separate one id per <|speaker:N|>.",
           ),
         model: z
           .string()
@@ -104,7 +114,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
       },
       output: {
         model: z.string(),
-        voice: z.string(),
+        voice: z.string().optional(),
         path: z.string(),
         mime_type: z.string(),
         bytes: z.number(),
@@ -119,11 +129,16 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
       const input = args.file ? await readText(args.file, root, signal) : (args.text ?? "");
       if (!input.trim()) throw badInput("Nothing to say: pass non-empty `text` or a text `file`.");
 
-      const model = args.model ?? config.speechModel ?? config.textModel;
+      const fish = usesFishApi(config);
+      const model = args.model ?? config.speechModel ?? config.textModel ?? (fish ? fishDefaultModel : undefined);
       if (!model) {
         throw new DtstError("CONFIG", "No speech model configured.", "Set OPENAI_SPEECH_MODEL or pass `model`.");
       }
-      const voice = args.voice ?? config.voice ?? (await firstVoice(config, model, signal)) ?? FALLBACK_VOICE;
+      // Fish picks its own default voice when no reference is sent.
+      const voice =
+        args.voice ??
+        config.voice ??
+        (fish ? undefined : ((await firstVoice(config, model, signal)) ?? FALLBACK_VOICE));
 
       const plan = await planOutput(args.output, root, slug(input, "speech"));
       const format = args.format ?? formatForExtension(plan.extension) ?? "mp3";
@@ -132,7 +147,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
         notes.push(`"${plan.extension}" is not an audio extension; saved as ${format}.`);
       }
 
-      await progress(`speaking ${input.length} characters with ${voice}`);
+      await progress(`speaking ${input.length} characters with ${voice ?? "the default voice"}`);
       const audio = await synthesize(config, { model, input, voice, format, args, signal });
       if (audio.format !== format) {
         notes.push(`The provider returned ${audio.format} instead of ${format}, so the file extension was adjusted.`);
@@ -158,7 +173,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
       content.push(
         text(
           [
-            `Saved speech (${model}, voice ${voice}):`,
+            `Saved speech (${model}, voice ${voice ?? "default"}):`,
             `- ${file} · ${audio.format}${length} · ${formatBytes(bytes)}`,
             ...notes.map((note) => `Note: ${note}`),
           ].join("\n"),
@@ -169,7 +184,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
         content,
         structuredContent: {
           model,
-          voice,
+          ...(voice ? { voice } : {}),
           path: file,
           mime_type: mimeType,
           bytes,
@@ -193,8 +208,13 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (args, { config, signal }) => {
-      const all = await listSpeechModels(config, signal);
-      const query = args.query?.toLowerCase();
+      const fish = usesFishApi(config);
+      const [all, voices] = await Promise.all([
+        fish ? Promise.resolve<SpeechModel[]>([...FISH_MODELS]) : listSpeechModels(config, signal),
+        fish ? listFishVoices(config, args.query, signal) : Promise.resolve(undefined),
+      ]);
+      // Fish catalog ids are bare ("drama-3"); accept the OpenRouter-style "fish-audio/drama-3" too.
+      const query = (fish && args.query ? fishModel(args.query) : args.query)?.toLowerCase();
       const models = all
         .filter(
           (model) =>
@@ -205,7 +225,22 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
         (model) =>
           `- ${model.id}${model.name ? ` (${model.name})` : ""}${model.voices?.length ? `\n  voices: ${model.voices.join(", ")}` : ""}`,
       );
-      const current = config.speechModel ?? config.textModel ?? "none — set OPENAI_SPEECH_MODEL";
+      const current =
+        config.speechModel ?? config.textModel ?? (fish ? fishDefaultModel : "none — set OPENAI_SPEECH_MODEL");
+      const voiceLine = (voice: FishVoice): string =>
+        `- ${voice.id} · ${voice.title}${voice.languages.length ? ` (${voice.languages.join(", ")})` : ""}`;
+      const voiceLines = voices
+        ? [
+            `Your voices (${voices.own.length}):`,
+            ...voices.own.map(voiceLine),
+            ...(args.query?.trim()
+              ? [
+                  `Library voices matching "${args.query.trim()}" (${voices.library.length}):`,
+                  ...voices.library.map(voiceLine),
+                ]
+              : ["Pass `query` to search the public voice library by name."]),
+          ]
+        : [];
       return {
         content: [
           text(
@@ -213,6 +248,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
               `Default model: ${current} · voice: ${config.voice ?? "provider default"}`,
               `${models.length} of ${all.length} models:`,
               ...lines,
+              ...voiceLines,
             ].join("\n"),
           ),
         ],
@@ -228,7 +264,7 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
 interface SpeechRequest {
   model: string;
   input: string;
-  voice: string;
+  voice?: string | undefined;
   format: AudioFormat;
   args: { instructions?: string | undefined; speed?: number | undefined };
   signal: AbortSignal;
@@ -240,36 +276,26 @@ interface Speech {
   durationS?: number;
 }
 
-/** POST /audio/speech. WAV is built locally from PCM where the endpoint only streams raw samples. */
+/**
+ * POST /audio/speech (OpenAI-compatible), or Fish Audio's native /v1/tts.
+ * WAV is built locally from PCM where the endpoint only streams raw samples.
+ */
 export async function synthesize(config: Config, request: SpeechRequest): Promise<Speech> {
-  // OpenRouter accepts only mp3 | pcm; everyone else gets the format that was asked for.
-  if (config.openRouter && !["mp3", "pcm", "wav"].includes(request.format)) {
-    throw new DtstError(
-      "UNSUPPORTED",
-      `OpenRouter speech returns mp3 or raw PCM, not ${request.format}.`,
-      "Use format mp3 or wav (wav is built from PCM locally).",
-    );
-  }
-  const wire = config.openRouter && request.format === "wav" ? "pcm" : request.format;
-  const body: Record<string, unknown> = {
-    model: request.model,
-    input: request.input,
-    voice: request.voice,
-    response_format: wire,
-  };
-  if (request.args.speed !== undefined) body["speed"] = request.args.speed;
-  if (request.args.instructions?.trim()) body["instructions"] = request.args.instructions;
-
+  const call = usesFishApi(config) ? fishRequest(config, request) : openAiRequest(config, request);
   let response;
   try {
-    response = await apiBinary(config, "/audio/speech", { json: body, signal: request.signal });
+    response = await apiBinary(call.config, call.endpoint, {
+      json: call.json,
+      headers: call.headers,
+      signal: request.signal,
+    });
   } catch (error) {
-    throw explain(error, request, wire);
+    throw explain(error, request, call.wire);
   }
   log.debug(`speech: ${response.data.length} bytes of ${response.contentType || "unknown type"}`);
 
-  if (isRawPcm(response.data, response.contentType, wire)) {
-    const layout = pcmLayout(response.contentType);
+  if (isRawPcm(response.data, response.contentType, call.wire)) {
+    const layout = call.layout ?? pcmLayout(response.contentType);
     if (request.format === "pcm") return withDuration(response.data, "pcm", layout);
     return withDuration(pcmToWav(response.data, layout), "wav");
   }
@@ -282,6 +308,36 @@ export async function synthesize(config: Config, request: SpeechRequest): Promis
     );
   }
   return withDuration(response.data, sniffed);
+}
+
+interface WireCall {
+  config: Config;
+  endpoint: string;
+  json: Record<string, unknown>;
+  headers?: Record<string, string>;
+  wire: AudioFormat;
+  layout?: PcmLayout;
+}
+
+function openAiRequest(config: Config, request: SpeechRequest): WireCall {
+  // OpenRouter accepts only mp3 | pcm; everyone else gets the format that was asked for.
+  if (config.openRouter && !["mp3", "pcm", "wav"].includes(request.format)) {
+    throw new DtstError(
+      "UNSUPPORTED",
+      `OpenRouter speech returns mp3 or raw PCM, not ${request.format}.`,
+      "Use format mp3 or wav (wav is built from PCM locally).",
+    );
+  }
+  const wire = config.openRouter && request.format === "wav" ? "pcm" : request.format;
+  const json: Record<string, unknown> = {
+    model: request.model,
+    input: request.input,
+    voice: request.voice ?? FALLBACK_VOICE,
+    response_format: wire,
+  };
+  if (request.args.speed !== undefined) json["speed"] = request.args.speed;
+  if (request.args.instructions?.trim()) json["instructions"] = request.args.instructions;
+  return { config, endpoint: "/audio/speech", json, wire };
 }
 
 function withDuration(data: Buffer, format: AudioFormat, layout?: PcmLayout): Speech {
@@ -316,7 +372,7 @@ function explain(error: unknown, request: SpeechRequest, wire: AudioFormat): unk
     return new DtstError(
       "BAD_INPUT",
       message,
-      `Voice "${request.voice}" is not available for ${request.model}. list_speech_models shows its voices when the provider publishes them; otherwise use a voice id from the provider's library.`,
+      `Voice "${request.voice ?? "default"}" is not available for ${request.model}. list_speech_models shows its voices when the provider publishes them; otherwise use a voice id from the provider's library.`,
       error.status,
     );
   }

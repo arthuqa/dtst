@@ -9,6 +9,7 @@
  *   OPENAI_VOICE        default text-to-speech voice
  *   DTST_WORKSPACE      root for relative paths (default: client root, else cwd)
  *   DTST_IMAGE_API      auto | images | openrouter | chat
+ *   DTST_SPEECH_API     auto | openai | fish (Fish Audio's native /v1/tts)
  *   DTST_TIMEOUT_MS     per-request timeout, default 300000
  */
 
@@ -19,6 +20,8 @@ import { registerSecret } from "./log";
 
 export type ImageApi = "auto" | "images" | "openrouter" | "chat";
 const IMAGE_APIS: readonly ImageApi[] = ["auto", "images", "openrouter", "chat"];
+export type SpeechApi = "auto" | "openai" | "fish";
+const SPEECH_APIS: readonly SpeechApi[] = ["auto", "openai", "fish"];
 
 export interface Config {
   baseUrl: string;
@@ -29,6 +32,7 @@ export interface Config {
   voice?: string;
   workspace?: string;
   imageApi: ImageApi;
+  speechApi: SpeechApi;
   timeoutMs: number;
   /** Extra headers (OpenRouter attribution). */
   headers: Record<string, string>;
@@ -82,6 +86,11 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new DtstError("CONFIG", `DTST_IMAGE_API must be one of ${IMAGE_APIS.join("|")}, got "${imageApi}".`);
   }
 
+  const speechApi = (read("DTST_SPEECH_API")?.toLowerCase() ?? "auto") as SpeechApi;
+  if (!SPEECH_APIS.includes(speechApi)) {
+    throw new DtstError("CONFIG", `DTST_SPEECH_API must be one of ${SPEECH_APIS.join("|")}, got "${speechApi}".`);
+  }
+
   const timeoutMs = Number(read("DTST_TIMEOUT_MS") ?? 300_000);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000) {
     throw new DtstError("CONFIG", "DTST_TIMEOUT_MS must be an integer >= 1000.");
@@ -94,6 +103,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     baseUrl: rawUrl.replace(/\/+$/, ""),
     apiKey,
     imageApi,
+    speechApi,
     timeoutMs,
     openRouter,
     headers: openRouter ? { "X-Title": "dtst", "HTTP-Referer": "https://github.com/arthuqa/dtst" } : {},

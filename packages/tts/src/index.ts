@@ -12,6 +12,7 @@ Environment:
   OPENAI_API_KEY        API key (optional for local endpoints)
   OPENAI_SPEECH_MODEL   default speech model (falls back to OPENAI_MODEL)
   OPENAI_VOICE          default voice (else the model's first listed voice, else alloy)
+  DTST_SPEECH_API       auto | openai | fish (default auto: fish for fish.audio hosts)
   DTST_WORKSPACE        root for relative paths (default: client root, else cwd)
   DTST_TIMEOUT_MS       request timeout (default 300000)
   DEBUG=1               verbose logs on stderr
