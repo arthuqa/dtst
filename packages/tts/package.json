@@ -1,6 +1,6 @@
 {
   "name": "@dtst/tts",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "MCP server for text-to-speech through any OpenAI-compatible API (OpenAI, OpenRouter, LiteLLM, local). Saves audio to the paths the agent asks for.",
   "keywords": [
     "mcp",
