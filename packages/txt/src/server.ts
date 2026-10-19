@@ -2,6 +2,7 @@ import {
   type Config,
   DtstError,
   type Input,
+  type TextInput,
   Server,
   VERSION,
   api,
@@ -23,7 +24,7 @@ export const NAME = "dtst-txt";
 const INSTRUCTIONS = `Text generation with a second model, grounded in workspace files.
 - generate_text: one-shot \`prompt\` or a multi-turn \`messages\` history; \`files\` adds files, folders, globs, URLs or images as context.
 - Pass \`output\` to save the result to a file; the text is returned either way.
-- read_files: read files, folders, URLs and images into this conversation.
+- read_files: read files, folders, URLs and images into this conversation; \`grep\` returns only matching lines.
 - list_text_models: model ids, context sizes and which accept images.`;
 
 const SYSTEM_PROMPT = [
@@ -175,28 +176,74 @@ export function createServer(env: NodeJS.ProcessEnv = process.env): Server {
     "read_files",
     {
       title: "Read files",
-      description: "Read files, folders, globs, URLs and images and return their contents (text and images) to you.",
+      description:
+        "Read files, folders, globs, URLs and images into this conversation. Use `grep` to get only the matching lines of large or many files.",
       input: {
         sources: sources.min(1),
+        grep: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Regular expression (case-insensitive). Return only matching lines, with line numbers, instead of whole files; images are left out.",
+          ),
         max_bytes: z
           .number()
           .int()
           .min(1024)
-          .max(8 * 1024 * 1024)
+          .max(READ_BUDGET)
           .optional()
-          .describe("Per-source text limit; longer text is truncated (default 262144)."),
+          .describe("Per-source text limit; longer text is truncated (default 262144). Ignored for grep."),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (args, { root, signal }) => {
-      const { inputs, skipped } = await loadInputs(args.sources, { root, signal, maxTextBytes: args.max_bytes });
-      const content: ContentBlock[] = inputs.map((input) =>
-        input.kind === "image"
-          ? image(input.data, input.mimeType)
-          : text(fileBlock(input.source, input.text, input.truncated)),
-      );
+      let pattern: RegExp | undefined;
+      if (args.grep !== undefined) {
+        try {
+          pattern = new RegExp(args.grep, "i");
+        } catch (error) {
+          throw badInput(`Invalid grep pattern: ${(error as Error).message}`);
+        }
+      }
+      // grep searches whole files (up to 8 MiB); only the matching lines count towards the reply budget.
+      const maxTextBytes = pattern ? 8 * 1024 * 1024 : args.max_bytes;
+      const { inputs, skipped } = await loadInputs(args.sources, { root, signal, maxTextBytes });
+
+      const content: ContentBlock[] = [];
+      const over: string[] = [];
+      let budget = READ_BUDGET;
+      let unmatched = 0;
+      let images = 0;
+      for (const input of inputs) {
+        if (input.kind === "image") {
+          if (pattern) images += 1;
+          else if (input.data.length * 1.34 > budget) over.push(input.source);
+          else {
+            budget -= input.data.length * 1.34;
+            content.push(image(input.data, input.mimeType));
+          }
+          continue;
+        }
+        const block = pattern ? grepBlock(input, pattern) : fileBlock(input.source, input.text, input.truncated);
+        if (!block) unmatched += 1;
+        else if (block.length > budget) over.push(input.source);
+        else {
+          budget -= block.length;
+          content.push(text(block));
+        }
+      }
+
+      const notes: string[] = [];
+      if (pattern && unmatched) notes.push(`No matches in ${unmatched} file${unmatched === 1 ? "" : "s"}.`);
+      if (images) notes.push(`${images} image${images === 1 ? "" : "s"} left out (grep reads text only).`);
+      if (over.length)
+        notes.push(
+          `Over the ${READ_BUDGET / 1024} KB reply limit, not returned (narrow \`sources\`, use \`grep\`, or read them in another call):\n${over.map((source) => `- ${source}`).join("\n")}`,
+        );
       if (skipped.length)
-        content.push(text(`Skipped:\n${skipped.map((entry) => `- ${entry.source}: ${entry.reason}`).join("\n")}`));
+        notes.push(`Skipped:\n${skipped.map((entry) => `- ${entry.source}: ${entry.reason}`).join("\n")}`);
+      if (notes.length) content.push(text(notes.join("\n")));
       if (content.length === 0) content.push(text("Nothing to read."));
       return { content };
     },
@@ -343,6 +390,22 @@ function preview(content: string): string {
 
 function formatBytes(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+/** Total size of one read_files reply (text characters plus base64 image size). */
+const READ_BUDGET = 1024 * 1024;
+const MAX_LINE = 300;
+
+/** Matching lines as `<line number>: <text>`, or undefined when nothing matches. */
+function grepBlock(input: TextInput, pattern: RegExp): string | undefined {
+  const lines = input.text.split(/\r?\n/);
+  const hits: string[] = [];
+  lines.forEach((line, index) => {
+    if (pattern.test(line)) hits.push(`${index + 1}: ${line.length > MAX_LINE ? `${line.slice(0, MAX_LINE)}…` : line}`);
+  });
+  if (hits.length === 0) return undefined;
+  const truncated = input.truncated ? ' truncated="true"' : "";
+  return `<file path="${input.source}" matches="${hits.length}"${truncated}>\n${hits.join("\n")}\n</file>`;
 }
 
 function fileBlock(source: string, content: string, truncated: boolean): string {

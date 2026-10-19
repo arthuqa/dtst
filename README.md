@@ -117,7 +117,9 @@ Both servers also read a `.env` file in their working directory. Since `img` and
 | `json`                                                      | Return a single JSON value (JSON mode)                                      |
 | `output` · `overwrite`                                      | Save the reply to a file (`.md` by default)                                 |
 
-`read_files { sources, max_bytes? }` returns text and images directly to the calling agent. `list_text_models { query?, limit? }` shows context size, vision support and price.
+`read_files { sources, grep?, max_bytes? }` returns text and images **to the calling agent** (no model call). `grep` (case-insensitive regex) returns only matching lines with line numbers, e.g. `{ "sources": ["src/**/*.ts"], "grep": "export (function|class)" }`. A reply is capped at 1 MB in total; whatever doesn't fit is listed by name.
+
+`list_text_models { query?, limit? }` shows context size, vision support and price.
 
 ## How files are saved
 

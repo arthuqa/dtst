@@ -187,6 +187,34 @@ describe("read_files", () => {
     expect(textOf(result)).toMatch(/<file path=".*notes\.md">\nRelease 3\.2/);
     expect(textOf(result)).toMatch(/Skipped:\n- nope\.md: Not found/);
   });
+
+  it("returns only matching lines with grep", async () => {
+    writeFileSync(path.join(root, "a.ts"), "import x from 'y';\nexport function TodoList() {}\nconst n = 1;\n");
+    writeFileSync(path.join(root, "b.ts"), "const unrelated = true;\n");
+    const result = await callTool(await client(), "read_files", { sources: ["*.ts", "shot.png"], grep: "^export" });
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: `<file path="${path.join(root, "a.ts")}" matches="1">\n2: export function TodoList() {}\n</file>`,
+      },
+      { type: "text", text: "No matches in 1 file.\n1 image left out (grep reads text only)." },
+    ]);
+    expect(textOf(await callTool(await client(), "read_files", { sources: ["a.ts"], grep: "(" }))).toMatch(
+      /^BAD_INPUT: Invalid grep pattern/,
+    );
+  });
+
+  it("caps the whole reply and lists what did not fit", async () => {
+    const big = "x".repeat(200 * 1024);
+    for (let i = 0; i < 8; i += 1) writeFileSync(path.join(root, `big-${i}.txt`), big);
+    const result = await callTool(await client(), "read_files", { sources: ["big-*.txt"] });
+    const files = result.content.filter((block) => block.type === "text" && block.text.startsWith("<file"));
+    expect(files).toHaveLength(5);
+    expect(JSON.stringify(result).length).toBeLessThan(1.1 * 1024 * 1024);
+    expect(textOf(result)).toMatch(
+      /Over the 1024 KB reply limit[\s\S]*- .*big-5\.txt\n- .*big-6\.txt\n- .*big-7\.txt$/,
+    );
+  });
 });
 
 describe("list_text_models", () => {

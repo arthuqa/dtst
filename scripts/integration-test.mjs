@@ -120,6 +120,13 @@ async function testTxt() {
       types,
     );
 
+    r = await call(client, "read_files", { sources: ["*.md", "red.png"], grep: "breaking" });
+    check(
+      "read_files grep returns only matching lines",
+      /^<file path=".*notes\.md" matches="1">\n4: - Breaking:/.test(r.text) && !r.text.includes("Release 3.2"),
+      r.text.split("\n").slice(0, 2).join(" | "),
+    );
+
     r = await call(client, "generate_text", {
       prompt: "Reply with exactly: PONG",
       max_tokens: 200,
