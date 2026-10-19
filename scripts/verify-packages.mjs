@@ -26,9 +26,9 @@ const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
 const skipInstall = args.includes("--no-install");
 
 const PACKAGES = [
-  { dir: "packages/img", name: "@dtst/img", bin: "img" },
-  { dir: "packages/txt", name: "@dtst/txt", bin: "txt" },
-].filter((entry) => !only || entry.bin === only || entry.name === only);
+  { dir: "packages/img", name: "@dtst/img", bin: "dtst-img" },
+  { dir: "packages/txt", name: "@dtst/txt", bin: "dtst-txt" },
+].filter((entry) => !only || entry.name === only || entry.name === `@dtst/${only}`);
 
 const failures = [];
 const notes = [];
@@ -59,16 +59,16 @@ for (const pkg of PACKAGES) {
   const dir = path.join(ROOT, pkg.dir);
   console.log(`\n▶ ${pkg.name} (${pkg.dir})`);
 
-  if (!existsSync(path.join(dir, "dist", "cli.js"))) {
-    fail(pkg.name, "dist/cli.js is missing — run the build first");
+  if (!existsSync(path.join(dir, "dist", "index.js"))) {
+    fail(pkg.name, "dist/index.js is missing — run the build first");
     continue;
   }
 
   // ── 1. static metadata ────────────────────────────────────────────────
   const manifest = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8"));
   if (manifest.name !== pkg.name) fail(pkg.name, `package.json name is ${manifest.name}`);
-  if (manifest.bin?.[pkg.bin] !== "dist/cli.js") {
-    fail(pkg.name, `bin.${pkg.bin} must point at dist/cli.js (npx resolves the bin by the unscoped name)`);
+  if (manifest.bin?.[pkg.bin] !== "dist/index.js") {
+    fail(pkg.name, `bin.${pkg.bin} must point at dist/index.js`);
   }
   if (manifest.publishConfig?.access !== "public")
     fail(pkg.name, "publishConfig.access must be public for a scoped package");
@@ -82,18 +82,18 @@ for (const pkg of PACKAGES) {
   ok("metadata (bin, publishConfig, engines, repository, files)");
 
   // ── 2. bundle ─────────────────────────────────────────────────────────
-  const bundle = readFileSync(path.join(dir, "dist", "cli.js"), "utf8");
-  if (!bundle.startsWith("#!/usr/bin/env node")) fail(pkg.name, "dist/cli.js is missing its shebang");
-  if (bundle.includes("@dtst/internal")) fail(pkg.name, "dist/cli.js still references the private workspace");
+  const bundle = readFileSync(path.join(dir, "dist", "index.js"), "utf8");
+  if (!bundle.startsWith("#!/usr/bin/env node")) fail(pkg.name, "dist/index.js is missing its shebang");
+  if (bundle.includes("@dtst/internal")) fail(pkg.name, "dist/index.js still references the private workspace");
   if (/from\s+["']\.\/[^"']+["']/.test(bundle))
-    fail(pkg.name, "dist/cli.js imports relative chunks (splitting must stay off)");
-  const bundleKb = statSync(path.join(dir, "dist", "cli.js")).size / 1024;
+    fail(pkg.name, "dist/index.js imports relative chunks (splitting must stay off)");
+  const bundleKb = statSync(path.join(dir, "dist", "index.js")).size / 1024;
   ok(`bundle self-contained (${bundleKb.toFixed(1)} KiB)`);
 
   // ── 3. tarball contents ───────────────────────────────────────────────
   const packed = packJson(dir);
   const files = packed.files.map((file) => file.path);
-  for (const required of ["package.json", "dist/cli.js", "dist/index.js", "README.md"]) {
+  for (const required of ["package.json", "dist/index.js", "README.md"]) {
     if (!files.includes(required)) fail(pkg.name, `tarball is missing ${required}`);
   }
   const leaked = files.filter(
@@ -122,7 +122,7 @@ for (const pkg of PACKAGES) {
     if (!version.includes(manifest.version))
       fail(pkg.name, `npx ${pkg.bin} --version printed ${JSON.stringify(version.trim())}`);
     const help = run("npx", ["--yes", `--package=${tarballPath}`, pkg.bin, "--help"], { cwd: workdir });
-    if (!help.includes("serve")) fail(pkg.name, "CLI --help does not mention the `serve` command");
+    if (!help.includes("Tools:")) fail(pkg.name, "--help does not list the tools");
     ok(`npx ${pkg.bin} runs from the packed tarball (v${manifest.version})`);
   } catch (error) {
     fail(pkg.name, `npx smoke test failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);

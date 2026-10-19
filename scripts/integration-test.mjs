@@ -1,344 +1,298 @@
 #!/usr/bin/env node
 /**
- * End-to-end integration test: spawns each MCP server over stdio, drives it
- * with the official MCP client, and makes REAL provider calls.
+ * Live end-to-end test: spawns the built servers over stdio, drives every tool with the
+ * official MCP client and makes REAL provider calls (costs a few cents).
  *
- *   node --env-file=.env scripts/integration-test.mjs [img|txt|all]
+ *   npm run build && npm run test:integration [img|txt]
  *
- * Requirements: a built dist (npm run build) and credentials in the
- * environment or a .env file. This script spends real money — a handful of
- * small image and text requests.
- *
- * Exit code 0 only when every assertion passes.
+ * Uses OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL / OPENAI_IMAGE_MODEL from the
+ * environment or .env. Exit code: 0 all passed, 1 failures, 3 only blocked by provider credits.
  */
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import process from "node:process";
+import { deflateSync } from "node:zlib";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
-const WORK = path.join(ROOT, "sandbox", "mcp-it");
+const WORK = path.join(ROOT, "sandbox", "it");
+const only = process.argv[2];
+const tally = { pass: 0, fail: 0, blocked: 0 };
 
-const results = [];
-let failures = 0;
-let cost = 0;
-
-function check(name, condition, detail) {
-  const ok = Boolean(condition);
-  if (!ok) failures += 1;
-  results.push(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-  if (!ok) console.error(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
-  else console.log(`  ✓ ${name}${detail ? ` — ${detail}` : ""}`);
+function check(name, ok, detail = "") {
+  tally[ok ? "pass" : "fail"] += 1;
+  console.log(`  ${ok ? "✓" : "✗"} ${name}${detail ? ` — ${String(detail).slice(0, 160)}` : ""}`);
 }
 
-function noteCost(usage) {
-  if (usage?.costUsd) cost += usage.costUsd;
-}
-
-function textOf(result) {
-  return (result.content ?? [])
+const textOf = (result) =>
+  (result.content ?? [])
     .filter((block) => block.type === "text")
     .map((block) => block.text)
     .join("\n");
+
+/** A real, solid-colour PNG so vision models have something unambiguous to look at. */
+function solidPng(size, [r, g, b]) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buffer) => {
+    let c = 0xffffffff;
+    for (const byte of buffer) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const out = Buffer.alloc(body.length + 8);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(crc(body), body.length + 4);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(size, 0);
+  header.writeUInt32BE(size, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(size * 3).map((_, i) => [r, g, b][i % 3])]);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(Buffer.concat(Array.from({ length: size }, () => row)))),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 async function connect(pkg) {
-  const entry = path.join(ROOT, "packages", pkg, "dist", "cli.js");
+  const entry = path.join(ROOT, "packages", pkg, "dist", "index.js");
   if (!existsSync(entry)) throw new Error(`Build first: missing ${entry}`);
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [entry],
-    cwd: ROOT,
-    env: integrationEnv(pkg),
+    env: { ...process.env, DTST_WORKSPACE: WORK },
     stderr: "pipe",
   });
-  const stderr = [];
-  transport.stderr?.on("data", (chunk) => stderr.push(String(chunk)));
-  const client = new Client({ name: "dtst-integration", version: "1.0.0" }, { capabilities: {} });
+  const client = new Client({ name: "dtst-integration", version: "1.0.0" });
   await client.connect(transport);
-  return { client, stderr, close: () => client.close() };
+  return client;
 }
 
-/**
- * Both servers read the same variable, `OPENAI_MODEL`. An MCP client points
- * them at different models through their separate env blocks, and this harness
- * does the same for the test run: the image model comes from
- * `DTST_TEST_IMAGE_MODEL` (falling back to `OPENAI_IMAGE_MODEL`, then
- * `OPENAI_MODEL`) and is only ever applied to the img server's environment.
- */
-function integrationEnv(pkg) {
-  const env = { ...process.env };
-  if (pkg === "img") {
-    const imageModel = process.env.DTST_TEST_IMAGE_MODEL ?? process.env.OPENAI_IMAGE_MODEL ?? process.env.OPENAI_MODEL;
-    if (imageModel) env.OPENAI_MODEL = imageModel;
-  }
-  return env;
-}
-
-async function call(client, name, args, options = {}) {
+async function call(client, name, args) {
+  const started = Date.now();
   const result = await client.callTool({ name, arguments: args }, undefined, {
+    timeout: 120_000,
     resetTimeoutOnProgress: true,
-    ...options,
+    onprogress: () => {},
   });
-  return { result, text: textOf(result) };
+  return { result, text: textOf(result), ms: Date.now() - started };
 }
 
-async function testImg() {
-  console.log("\n▶ @dtst/img (MCP stdio, real provider calls)");
-  const { client, close, stderr } = await connect("img");
-  try {
-    const tools = await client.listTools();
-    const names = tools.tools.map((tool) => tool.name).sort();
-    check("img: tools registered", names.length === 3, names.join(", "));
-    check(
-      "img: generate_image has a schema",
-      Boolean(tools.tools.find((t) => t.name === "generate_image")?.inputSchema),
-    );
-
-    const listed = await call(client, "list_image_models", { query: "muse", limit: 10 });
-    check("img: list_image_models responds", listed.text.includes("models:"), listed.text.split("\n")[0]);
-    check("img: list_image_models is not an error", listed.result.isError !== true);
-
-    // --- generate ---------------------------------------------------------
-    const generated = await call(client, "generate_image", {
-      prompt: "a tiny paper boat floating on a rain puddle, macro photograph, soft morning light",
-      n: 1,
-      output_dir: "sandbox/mcp-it",
-      filename: "boat",
-    });
-    check("img: generate_image succeeded", generated.result.isError !== true, generated.text.split("\n")[0]);
-    const structured = generated.result.structuredContent ?? {};
-    noteCost(structured.usage);
-    const image = structured.images?.[0];
-    check("img: returned a saved path", typeof image?.path === "string" && existsSync(image.path), image?.path);
-    check("img: sniffed an image mime type", (image?.mimeType ?? "").startsWith("image/"), image?.mimeType);
-    check(
-      "img: reported dimensions",
-      Boolean(image?.width && image?.height),
-      image ? `${image.width}x${image.height}` : "-",
-    );
-    check("img: returned an artifact uri", typeof image?.artifact === "string", image?.artifact);
-    const blocks = generated.result.content ?? [];
-    check(
-      "img: inlined image content block",
-      blocks.some((block) => block.type === "image"),
-      `${blocks.length} blocks`,
-    );
-    check(
-      "img: returned a resource link",
-      blocks.some((block) => block.type === "resource_link"),
-    );
-
-    // --- read back the artifact resource ----------------------------------
-    if (image?.artifact) {
-      const resource = await client.readResource({ uri: image.artifact });
-      check(
-        "img: artifact resource is readable",
-        resource.contents?.some((entry) => Boolean(entry.blob ?? entry.text)),
-        resource.contents?.[0]?.mimeType,
-      );
-      const resources = await client.listResources();
-      check(
-        "img: artifact appears in resources/list",
-        (resources.resources ?? []).some((entry) => entry.uri === image.artifact),
-        `${resources.resources?.length ?? 0} resources`,
-      );
-    }
-
-    // --- edit the generated image via its artifact URI ---------------------
-    const edited = await call(client, "edit_image", {
-      prompt: "turn this into a soft watercolour illustration, keep the composition",
-      images: [image?.artifact ?? image?.path],
-      output_dir: "sandbox/mcp-it",
-      filename: "boat-watercolour",
-    });
-    check("img: edit_image via artifact URI succeeded", edited.result.isError !== true, edited.text.split("\n")[0]);
-    noteCost(edited.result.structuredContent?.usage);
-    const editedImage = edited.result.structuredContent?.images?.[0];
-    check("img: edit wrote a new file", Boolean(editedImage?.path && existsSync(editedImage.path)), editedImage?.path);
-    check(
-      "img: edit produced different bytes",
-      editedImage?.bytes && image?.bytes && editedImage.bytes !== image.bytes,
-      `${image?.bytes} -> ${editedImage?.bytes}`,
-    );
-
-    // --- error path is actionable, not a crash ----------------------------
-    const bad = await call(client, "generate_image", {
-      prompt: "test",
-      model: "definitely/not-a-real-model-xyz",
-      output_dir: "sandbox/mcp-it",
-    });
-    check("img: unknown model reports isError", bad.result.isError === true);
-    check("img: error mentions a code", /[A-Z_]{4,}:/.test(bad.text), bad.text.split("\n")[0]?.slice(0, 120));
-
-    if (stderr.length > 0) console.log(`  (server stderr lines: ${stderr.length})`);
-  } finally {
-    await close();
+/** An image call that fails only because the account is out of credits is "blocked", not failed. */
+function blockedByCredits(name, { result, text }) {
+  if (result.isError && text.startsWith("CREDITS:")) {
+    tally.blocked += 1;
+    console.log(`  ⊘ ${name} — BLOCKED: ${text.split("\n")[0]}`);
+    return true;
   }
+  return false;
 }
 
 async function testTxt() {
-  console.log("\n▶ @dtst/txt (MCP stdio, real provider calls)");
-  const { client, close } = await connect("txt");
+  console.log(`\n▶ dtst-txt · ${process.env.OPENAI_MODEL}`);
+  const client = await connect("txt");
   try {
-    const tools = await client.listTools();
-    const names = tools.tools.map((tool) => tool.name).sort();
-    check("txt: tools registered", names.length === 4, names.join(", "));
+    const tools = (await client.listTools()).tools.map((tool) => tool.name).sort();
+    check("tools", tools.join() === "generate_text,list_text_models,read_files", tools.join(", "));
 
-    const prompts = await client.listPrompts();
+    let r = await call(client, "list_text_models", { query: process.env.OPENAI_MODEL, limit: 3 });
     check(
-      "txt: write prompt registered",
-      prompts.prompts.some((prompt) => prompt.name === "write"),
+      "list_text_models finds the configured model",
+      !r.result.isError && r.text.split("\n").some((line) => line.startsWith(`- ${process.env.OPENAI_MODEL} `)),
+      r.text.split("\n")[2],
     );
 
-    const models = await call(client, "list_models", { query: "luna", limit: 5 });
-    check("txt: list_models responds", models.text.includes("models:"), models.text.split("\n")[0]);
+    r = await call(client, "read_files", { sources: ["notes.md", "red.png", "missing.md"] });
+    const types = r.result.content.map((block) => block.type).join();
+    check(
+      "read_files returns text + image + skipped",
+      types === "text,image,text" && r.text.includes("Release 3.2"),
+      types,
+    );
 
-    // --- read_context on files + images -----------------------------------
-    const context = await call(client, "read_context", {
-      files: ["sandbox/mcp-it/notes.md"],
-      images: ["sandbox/mcp-it/fixture.png"],
+    r = await call(client, "generate_text", {
+      prompt: "Reply with exactly: PONG",
+      max_tokens: 200,
+      reasoning_effort: "low",
     });
-    check("txt: read_context is not an error", context.result.isError !== true, context.text.split("\n")[0]);
-    const contextStructured = context.result.structuredContent ?? {};
-    check(
-      "txt: read a text chunk",
-      (contextStructured.chunks?.length ?? 0) >= 1,
-      `${contextStructured.chunks?.length} chunks`,
-    );
-    check(
-      "txt: read an image",
-      (contextStructured.images?.length ?? 0) >= 1,
-      `${contextStructured.images?.length} images`,
-    );
-    check(
-      "txt: returned image content blocks",
-      (context.result.content ?? []).some((block) => block.type === "image"),
-    );
+    check("generate_text prompt", !r.result.isError && /PONG/.test(r.text), `${r.text.split("\n")[0]} · ${r.ms}ms`);
+    const usage = r.result.structuredContent?.usage;
+    check("generate_text reports usage", usage?.input_tokens > 0, JSON.stringify(usage));
 
-    const resources = await client.listResources();
-    check(
-      "txt: read files appear as MCP resources",
-      (resources.resources ?? []).some((entry) => entry.uri.startsWith("dtst://artifact/")),
-      `${resources.resources?.length ?? 0} resources`,
-    );
-    const firstArtifact = (resources.resources ?? []).find((entry) => entry.uri.startsWith("dtst://artifact/"));
-    if (firstArtifact) {
-      const read = await client.readResource({ uri: firstArtifact.uri });
-      check("txt: artifact resource is readable", (read.contents?.length ?? 0) > 0, read.contents?.[0]?.mimeType);
-    }
-
-    // --- write_text with context, images and an output path ---------------
-    const written = await call(client, "write_text", {
-      instructions: "In one sentence, state what changed in the release notes and what is breaking. No preamble.",
-      context: { files: ["sandbox/mcp-it/notes.md"] },
-      // One real image plus one missing path: the missing one must be reported, not fatal.
-      images: ["sandbox/mcp-it/fixture.png", "sandbox/mcp-it/does-not-exist.png"],
-      verbosity: "concise",
-      format: "text",
-      output_path: "sandbox/mcp-it/release-summary.md",
-      overwrite: true,
-    });
-    check("txt: write_text succeeded", written.result.isError !== true, written.text.split("\n")[0]);
-    const writtenStructured = written.result.structuredContent ?? {};
-    noteCost(writtenStructured.usage);
-    check(
-      "txt: wrote the requested file",
-      writtenStructured.saved?.path?.endsWith("release-summary.md") === true,
-      writtenStructured.saved?.path,
-    );
-    check(
-      "txt: reported usage",
-      typeof writtenStructured.usage?.totalTokens === "number",
-      JSON.stringify(writtenStructured.usage),
-    );
-    check(
-      "txt: reported context summary",
-      (writtenStructured.context?.chunks ?? 0) >= 1,
-      JSON.stringify(writtenStructured.context ?? {}),
-    );
-    check(
-      "txt: reported the skipped image",
-      (writtenStructured.skippedImages?.length ?? 0) === 1,
-      JSON.stringify(writtenStructured.skippedImages ?? []),
-    );
-
-    // --- chat -------------------------------------------------------------
-    const chat = await call(client, "chat", {
+    r = await call(client, "generate_text", {
       messages: [
-        { role: "user", content: "Reply with exactly the word: PONG" },
-        { role: "assistant", content: "PONG" },
-        { role: "user", content: "Now reply with exactly the word: PING" },
+        { role: "user", content: "The code word is HERON. Acknowledge briefly." },
+        { role: "assistant", content: "Noted." },
       ],
-      max_tokens: 16,
+      prompt: "What is the code word? Answer with the word only.",
+      max_tokens: 200,
     });
-    check("txt: chat succeeded", chat.result.isError !== true, chat.text.split("\n")[0]);
+    check("generate_text multi-turn", /HERON/i.test(r.text), r.text.split("\n")[0]);
+
+    r = await call(client, "generate_text", {
+      prompt: "What is the dominant colour of the attached image? One lowercase word.",
+      files: ["red.png"],
+      max_tokens: 200,
+    });
+    check("generate_text vision (image file)", /red/i.test(r.text), r.text.split("\n")[0]);
+
+    r = await call(client, "generate_text", {
+      prompt: "Summarise these release notes as exactly 3 Markdown bullets.",
+      files: ["notes.md"],
+      system: "Audience: non-technical users.",
+      output: "reports/summary.md",
+      max_tokens: 600,
+    });
+    const saved = r.result.structuredContent?.path;
     check(
-      "txt: chat followed the latest turn",
-      /PING/i.test(chat.result.structuredContent?.text ?? ""),
-      chat.result.structuredContent?.text,
+      "generate_text grounded + saved to file",
+      saved?.endsWith("reports/summary.md") && readFileSync(saved, "utf8").includes("-"),
+      saved,
     );
-    noteCost(chat.result.structuredContent?.usage);
 
-    // --- prompt template --------------------------------------------------
-    const prompt = await client.getPrompt({
-      name: "write",
-      arguments: { task: "Describe the panda briefly", tone: "playful", length: "one line" },
+    r = await call(client, "generate_text", {
+      prompt: 'Return {"colour": <the colour of the image>, "release": <release number in the notes>}',
+      files: ["notes.md", "red.png"],
+      json: true,
+      max_tokens: 300,
     });
-    check("txt: getPrompt returns a message", (prompt.messages?.length ?? 0) >= 1);
+    let parsed;
+    try {
+      parsed = JSON.parse(r.result.structuredContent?.text ?? "");
+    } catch {}
+    check(
+      "generate_text json mode",
+      /red/i.test(parsed?.colour ?? "") && /3\.2/.test(String(parsed?.release)),
+      JSON.stringify(parsed),
+    );
 
-    // --- bad input is reported, not thrown --------------------------------
-    const bad = await call(client, "write_text", { instructions: "x", model: "nope/not-a-model" });
-    check("txt: unknown model reports isError", bad.result.isError === true);
-    check("txt: error is actionable", /[A-Z_]{4,}:/.test(bad.text), bad.text.split("\n")[0]?.slice(0, 140));
+    const tool = (await client.listTools()).tools.find((entry) => entry.name === "generate_text");
+    check(
+      "schema names the configured model",
+      tool.inputSchema.properties.model.description.includes(`(${process.env.OPENAI_MODEL})`),
+      tool.inputSchema.properties.model.description,
+    );
+
+    r = await call(client, "generate_text", {
+      prompt:
+        "Create a complete single-file TODO app: index.html with inline CSS and JS, add/complete/delete tasks, persisted in localStorage. Return only the HTML.",
+      output: "todo/index.html",
+      max_tokens: 8000,
+      reasoning_effort: "low",
+    });
+    const todo = r.result.structuredContent ?? {};
+    const html = todo.path && existsSync(todo.path) ? readFileSync(todo.path, "utf8") : "";
+    check(
+      "TODO app saved as HTML",
+      /<html[\s>]/i.test(html) && /localStorage/.test(html) && /<\/html>\s*$/i.test(html),
+      `${todo.path} · ${html.length} chars · ${r.ms}ms`,
+    );
+    const returned = JSON.stringify(r.result).length;
+    check(
+      "only path + preview returned to the agent",
+      todo.text === undefined && returned < 2000 && returned < html.length / 4,
+      `${returned} chars returned vs ${html.length} in the file`,
+    );
+
+    r = await call(client, "generate_text", { prompt: "hi", model: "nope/not-a-model" });
+    check(
+      "unknown model → actionable error",
+      r.result.isError && /^UNSUPPORTED: [\s\S]*Hint: /.test(r.text),
+      r.text.split("\n")[0],
+    );
   } finally {
-    await close();
+    await client.close();
   }
 }
 
-const target = (process.argv[2] ?? "all").toLowerCase();
+async function testImg() {
+  console.log(`\n▶ dtst-img · ${process.env.OPENAI_IMAGE_MODEL ?? process.env.OPENAI_MODEL}`);
+  const client = await connect("img");
+  try {
+    const tools = (await client.listTools()).tools.map((tool) => tool.name).sort();
+    check("tools", tools.join() === "edit_image,generate_image,list_image_models", tools.join(", "));
+
+    const imageModel = process.env.OPENAI_IMAGE_MODEL ?? "";
+    let r = await call(client, "list_image_models", { query: imageModel.split("/").pop() });
+    check(
+      "list_image_models finds the configured model",
+      !r.result.isError && r.text.includes(`- ${imageModel}`),
+      r.text.split("\n")[2],
+    );
+
+    r = await call(client, "generate_image", {
+      prompt: "A watercolour red panda reading a book, soft light",
+      aspect_ratio: "1:1",
+      output: "img/panda.webp",
+    });
+    let generated;
+    if (!blockedByCredits("generate_image", r)) {
+      generated = r.result.structuredContent?.images?.[0];
+      check(
+        "generate_image saved a file",
+        !r.result.isError && generated && existsSync(generated.path),
+        r.text.split("\n")[1] ?? r.text,
+      );
+      check(
+        "generate_image inline preview",
+        r.result.content.some((block) => block.type === "image"),
+      );
+      check(
+        "generate_image resource link",
+        r.result.content.some((block) => block.type === "resource_link"),
+      );
+    }
+
+    r = await call(client, "edit_image", {
+      prompt: "Turn this into a blue square",
+      images: [generated?.path ?? "red.png"],
+      output: "img/edited.png",
+    });
+    if (!blockedByCredits("edit_image", r)) {
+      const edited = r.result.structuredContent?.images?.[0];
+      check(
+        "edit_image saved a file",
+        !r.result.isError && edited && existsSync(edited.path),
+        r.text.split("\n")[1] ?? r.text,
+      );
+    }
+
+    r = await call(client, "generate_image", { prompt: "x", model: process.env.OPENAI_MODEL });
+    check(
+      "text model → explained error",
+      r.result.isError && /does not generate images|Unknown model/.test(r.text),
+      r.text.split("\n")[0],
+    );
+
+    r = await call(client, "edit_image", { prompt: "x", images: ["missing.png"] });
+    check("missing input → BAD_INPUT", r.result.isError && r.text.startsWith("BAD_INPUT"), r.text.split("\n")[0]);
+  } finally {
+    await client.close();
+  }
+}
 
 rmSync(WORK, { recursive: true, force: true });
 mkdirSync(WORK, { recursive: true });
-
-// Self-contained fixtures so the suite runs anywhere (including CI).
 writeFileSync(
   path.join(WORK, "notes.md"),
-  [
-    "Release 3.2 highlights:",
-    "- The image tool now accepts multiple input images.",
-    "- Retry logic honours Retry-After headers.",
-    "- Breaking: DTST_OUTPUT_DIR now resolves relative to DTST_WORKSPACE.",
-    "",
-  ].join("\n"),
+  "Release 3.2 highlights:\n- Image tool accepts multiple inputs.\n- Retries honour Retry-After.\n- Breaking: output paths resolve against the workspace.\n",
 );
-// Smallest valid PNG (1x1, transparent).
-writeFileSync(
-  path.join(WORK, "fixture.png"),
-  Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "base64",
-  ),
-);
-
-if (!process.env.OPENAI_API_KEY && !existsSync(path.join(ROOT, ".env"))) {
-  console.error("No credentials: set OPENAI_API_KEY or run with --env-file=.env");
-  process.exit(2);
-}
+writeFileSync(path.join(WORK, "red.png"), solidPng(64, [220, 20, 20]));
 
 const started = Date.now();
-if (target === "img" || target === "all") await testImg();
-if (target === "txt" || target === "all") await testTxt();
-
-console.log("\n──────── summary ────────");
-for (const line of results) console.log(line);
+if (only !== "img") await testTxt();
+if (only !== "txt") await testImg();
 console.log(
-  `\n${results.length - failures}/${results.length} checks passed · provider spend ≈ $${cost.toFixed(4)} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  `\n${tally.pass} passed · ${tally.fail} failed · ${tally.blocked} blocked · ${((Date.now() - started) / 1000).toFixed(1)}s · output in ${path.relative(ROOT, WORK)}/`,
 );
-if (failures > 0) {
-  console.error(`\n${failures} check(s) FAILED`);
-  process.exit(1);
-}
-console.log("\nAll integration checks passed.");
+process.exit(tally.fail > 0 ? 1 : tally.blocked > 0 ? 3 : 0);

@@ -7,7 +7,7 @@
  *   - a missing shebang (breaks the `bin` entry)
  *   - relative chunk imports that would not survive `files: ["dist"]`
  *
- * Usage: node scripts/check-bundle.mjs packages/img/dist/cli.js
+ * Usage: node scripts/check-bundle.mjs packages/img/dist/index.js
  */
 
 import { chmodSync, existsSync, readFileSync, statSync } from "node:fs";
@@ -15,7 +15,7 @@ import path from "node:path";
 
 const target = process.argv[2];
 if (!target) {
-  console.error("usage: check-bundle.mjs <path/to/dist/cli.js>");
+  console.error("usage: check-bundle.mjs <path/to/dist/index.js>");
   process.exit(2);
 }
 
@@ -40,10 +40,6 @@ if (!existsSync(file)) {
   const relativeImports = [...source.matchAll(/from\s+["'](\.\/[^"']+)["']/g)].map((match) => match[1]);
   if (relativeImports.length > 0) {
     failures.push(`bundle imports relative chunks (${relativeImports.join(", ")}); set splitting: false`);
-  }
-
-  if (/\bprocess\.stdout\.write\(/.test(source) === false) {
-    notes.push("no process.stdout.write found; CLI output may be missing");
   }
 
   chmodSync(file, 0o755);

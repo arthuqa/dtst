@@ -1,232 +1,124 @@
-/**
- * HTTP plumbing for non-OpenAI-shaped endpoints (OpenRouter's image API,
- * model discovery) and for downloading remote image inputs.
- *
- * The OpenAI SDK covers chat completions and the OpenAI image endpoints;
- * this module covers everything else, with retries, timeouts, cancellation
- * and byte limits.
- */
+/** Minimal OpenAI-compatible HTTP client: auth, timeout, cancellation, retries with Retry-After. */
 
-import { DtstError, type ErrorCode, isDtstError, toDtstError } from "./errors";
-import { logger } from "./log";
+import type { Config } from "./config";
+import { DtstError, httpError, toDtstError } from "./errors";
+import { log } from "./log";
 
-export interface RequestOptions {
-  method?: "GET" | "POST" | "DELETE";
-  headers?: Record<string, string>;
-  body?: unknown;
-  timeoutMs?: number;
-  maxRetries?: number;
-  signal?: AbortSignal;
-  /** Max response size. Default 32 MiB. */
-  maxBytes?: number;
-  /** Label used in error messages. */
-  label?: string;
+export interface ApiRequest {
+  method?: "GET" | "POST";
+  json?: unknown;
+  form?: FormData;
+  signal?: AbortSignal | undefined;
+  /** Retries for 429 / 5xx / network errors. Default 2. */
+  retries?: number;
 }
 
-export interface JsonResponse<T = unknown> {
-  status: number;
-  ok: boolean;
-  headers: Headers;
-  json: T;
-  text: string;
-}
+export async function api<T>(config: Config, endpoint: string, request: ApiRequest = {}): Promise<T> {
+  const url = `${config.baseUrl}${endpoint}`;
+  const retries = request.retries ?? 2;
+  const headers: Record<string, string> = { accept: "application/json", ...config.headers };
+  if (config.apiKey) headers["authorization"] = `Bearer ${config.apiKey}`;
+  if (request.json !== undefined) headers["content-type"] = "application/json";
+  const body = request.form ?? (request.json === undefined ? undefined : JSON.stringify(request.json));
+  const method = request.method ?? (body === undefined ? "GET" : "POST");
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
-
-/**
- * POST/GET JSON with retry on 408/409/429/5xx, exponential backoff with
- * jitter, and `Retry-After` support. Throws DtstError on failure.
- */
-export async function requestJson<T = unknown>(url: string, options: RequestOptions = {}): Promise<JsonResponse<T>> {
-  const label = options.label ?? url;
-  const maxRetries = options.maxRetries ?? 2;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    if (attempt > 0) {
-      const delay = backoffDelay(attempt, lastError);
-      logger.debug("retrying request", { label, attempt, delayMs: delay });
-      await sleep(delay, options.signal);
-    }
+  for (let attempt = 0; ; attempt += 1) {
+    let error: DtstError;
     try {
-      // `fetchOnce` throws on non-ok responses, so retryable statuses arrive
-      // through the catch block below with their Retry-After value attached.
-      return (await fetchOnce(url, { ...options, timeoutMs })) as JsonResponse<T>;
-    } catch (error) {
-      if (isAbort(error)) throw toDtstError(error);
-      lastError = error;
-      if (!isRetryable(error) || attempt >= maxRetries) break;
+      const signal = withTimeout(request.signal, config.timeoutMs);
+      const response = await fetch(url, { method, headers, body, signal });
+      const text = await response.text();
+      const data = parseJson(text);
+      // Some gateways (OpenRouter included) report failures inside a 200 body.
+      const embedded = (data as { error?: { code?: unknown } } | undefined)?.error;
+      if (response.ok && !embedded) return data as T;
+      const status = response.ok ? (typeof embedded?.code === "number" ? embedded.code : 502) : response.status;
+      error = httpError(status, errorMessage(data, text), retryAfter(response.headers.get("retry-after")));
+    } catch (caught) {
+      if (request.signal?.aborted) throw new DtstError("CANCELLED", "Request cancelled.");
+      error = toDtstError(caught);
     }
+    if (!error.retryable || attempt >= retries) throw error;
+    const delay = Math.min(error.retryAfterMs ?? 1000 * 2 ** attempt, 30_000);
+    log.debug(`retrying ${method} ${endpoint} in ${delay}ms`, error.message);
+    await sleep(delay, request.signal);
   }
-  throw toDtstError(lastError);
 }
 
-async function fetchOnce(url: string, options: RequestOptions & { timeoutMs: number }): Promise<JsonResponse> {
-  const timeoutSignal = AbortSignal.timeout(options.timeoutMs);
-  const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
-  const headers: Record<string, string> = {
-    accept: "application/json",
-    ...options.headers,
-  };
-  if (options.body !== undefined) headers["content-type"] ??= "application/json";
-
-  const response = await fetch(url, {
-    method: options.method ?? (options.body === undefined ? "GET" : "POST"),
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    signal,
-    redirect: "follow",
-  });
-
-  const text = await readLimited(response, options.maxBytes ?? DEFAULT_MAX_BYTES);
-  const json = safeParse(text);
-  if (!response.ok) throw httpError(response.status, json, text, url, response.headers);
-  return { status: response.status, ok: true, headers: response.headers, json, text };
-}
-
-function httpError(status: number, json: unknown, text: string, label: string, headers?: Headers): DtstError {
-  const message = extractErrorMessage(json, text) ?? text.slice(0, 300);
-  const retryAfterMs = parseRetryAfter(headers?.get("retry-after"));
-  return new DtstError(errorCodeForStatus(status), `${label} -> HTTP ${status}: ${message}`, {
-    status,
-    retryable: status === 429 || status >= 500,
-    ...(retryAfterMs === undefined ? {} : { details: { retryAfterMs } }),
-  });
-}
-
-function errorCodeForStatus(status: number): ErrorCode {
-  if (status === 401 || status === 403) return "PROVIDER_AUTH";
-  if (status === 404) return "PROVIDER_UNSUPPORTED";
-  if (status === 429) return "PROVIDER_RATE_LIMIT";
-  return "PROVIDER_ERROR";
-}
-
-/** Only retry transport failures and explicitly retryable statuses. */
-function isRetryable(error: unknown): boolean {
-  return isDtstError(error) ? error.retryable : true;
-}
-
-/** `Retry-After` in either delta-seconds or HTTP-date form. */
-function parseRetryAfter(value: string | null | undefined): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
-  const date = Date.parse(value);
-  if (Number.isFinite(date)) return Math.max(0, date - Date.now());
-  return undefined;
-}
-
-export function extractErrorMessage(json: unknown, raw: string): string | undefined {
-  if (typeof json === "string" && json.trim()) return json.trim().slice(0, 300);
-  if (json && typeof json === "object") {
-    const record = json as Record<string, unknown>;
-    const candidates = [
-      record["error"],
-      (record["error"] as Record<string, unknown> | undefined)?.["message"],
-      record["message"],
-      record["detail"],
-      record["error_description"],
-    ];
-    for (const candidate of candidates) {
-      if (typeof candidate === "string" && candidate.trim()) return candidate.trim().slice(0, 300);
-    }
-  }
-  const trimmed = raw.trim();
-  return trimmed ? trimmed.slice(0, 300) : undefined;
-}
-
-function safeParse(text: string): unknown {
-  const trimmed = text.trim();
-  if (!trimmed) return undefined;
-  if (!/^[[{"]/.test(trimmed)) return undefined;
+/** Download a URL with a byte cap; `truncate` keeps the first `maxBytes` instead of failing. */
+export async function download(
+  url: string,
+  options: { maxBytes: number; truncate?: boolean; signal?: AbortSignal | undefined; timeoutMs?: number },
+): Promise<{ data: Buffer; contentType: string; truncated: boolean }> {
+  let response: Response;
   try {
-    return JSON.parse(trimmed);
+    response = await fetch(url, {
+      signal: withTimeout(options.signal, options.timeoutMs ?? 60_000),
+      redirect: "follow",
+    });
+  } catch (error) {
+    throw toDtstError(error);
+  }
+  if (!response.ok) throw httpError(response.status, `GET ${url} failed`);
+  const chunks: Buffer[] = [];
+  let size = 0;
+  let truncated = false;
+  for await (const chunk of response.body ?? []) {
+    const buffer = Buffer.from(chunk as Uint8Array);
+    if (size + buffer.length > options.maxBytes) {
+      if (!options.truncate) throw new DtstError("BAD_INPUT", `${url} is larger than ${options.maxBytes} bytes.`);
+      chunks.push(buffer.subarray(0, options.maxBytes - size));
+      truncated = true;
+      break;
+    }
+    chunks.push(buffer);
+    size += buffer.length;
+  }
+  return { data: Buffer.concat(chunks), contentType: response.headers.get("content-type") ?? "", truncated };
+}
+
+function withTimeout(signal: AbortSignal | undefined, ms: number): AbortSignal {
+  const timeout = AbortSignal.timeout(ms);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
   } catch {
     return undefined;
   }
 }
 
-async function readLimited(response: Response, maxBytes: number): Promise<string> {
-  const declared = Number(response.headers.get("content-length") ?? "");
-  if (Number.isFinite(declared) && declared > maxBytes) {
-    throw new DtstError("PROVIDER_ERROR", `Response too large (${declared} bytes > ${maxBytes} byte limit).`);
+export function errorMessage(data: unknown, raw = ""): string {
+  const record = (data ?? {}) as { error?: unknown; message?: unknown; detail?: unknown };
+  const nested =
+    typeof record.error === "object" && record.error ? (record.error as { message?: unknown }).message : undefined;
+  for (const candidate of [nested, record.error, record.message, record.detail]) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim().slice(0, 500);
   }
-  const array = await response.arrayBuffer();
-  if (array.byteLength > maxBytes) {
-    throw new DtstError("PROVIDER_ERROR", `Response too large (${array.byteLength} bytes > ${maxBytes} byte limit).`);
-  }
-  return Buffer.from(array).toString("utf8");
+  return raw.trim().slice(0, 300);
 }
 
-/** Download binary content (used for remote image inputs). */
-export async function fetchBinary(
-  url: string,
-  options: { headers?: Record<string, string>; timeoutMs?: number; maxBytes?: number; signal?: AbortSignal } = {},
-): Promise<{ data: Buffer; contentType?: string; finalUrl: string }> {
-  const maxBytes = options.maxBytes ?? 25 * 1024 * 1024;
-  const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? 60_000);
-  const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
-  let response: Response;
-  try {
-    response = await fetch(url, { headers: options.headers, signal, redirect: "follow" });
-  } catch (error) {
-    throw toDtstError(error);
-  }
-  if (!response.ok) {
-    throw new DtstError("PROVIDER_ERROR", `Failed to download ${url} (HTTP ${response.status}).`, {
-      status: response.status,
-      retryable: response.status === 429 || response.status >= 500,
-    });
-  }
-  const declared = Number(response.headers.get("content-length") ?? "");
-  if (Number.isFinite(declared) && declared > maxBytes) {
-    throw new DtstError("BAD_INPUT", `Remote image is too large (${declared} bytes > ${maxBytes} byte limit).`);
-  }
-  const array = await response.arrayBuffer();
-  if (array.byteLength > maxBytes) {
-    throw new DtstError("BAD_INPUT", `Remote image is too large (${array.byteLength} bytes > ${maxBytes} byte limit).`);
-  }
-  const contentType = response.headers.get("content-type") ?? undefined;
-  return {
-    data: Buffer.from(array),
-    ...(contentType === undefined ? {} : { contentType }),
-    finalUrl: response.url || url,
-  };
+function retryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 }
 
-export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DtstError("CANCELLED", "Aborted."));
-      return;
-    }
+    if (signal?.aborted) return reject(new DtstError("CANCELLED", "Request cancelled."));
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(new DtstError("CANCELLED", "Request cancelled."));
+    };
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      reject(new DtstError("CANCELLED", "Aborted."));
-    };
     signal?.addEventListener("abort", onAbort, { once: true });
   });
-}
-
-function backoffDelay(attempt: number, error: unknown): number {
-  const retryAfter = extractRetryAfter(error);
-  if (retryAfter !== undefined) return Math.min(retryAfter, 30_000);
-  const base = Math.min(1000 * 2 ** (attempt - 1), 8000);
-  return base + Math.random() * 250;
-}
-
-function extractRetryAfter(error: unknown): number | undefined {
-  if (!isDtstError(error)) return undefined;
-  const details = error.details as { retryAfterMs?: unknown } | undefined;
-  return typeof details?.retryAfterMs === "number" ? details.retryAfterMs : undefined;
-}
-
-function isAbort(error: unknown): boolean {
-  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
 }

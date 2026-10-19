@@ -1,148 +1,78 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DtstError, extractErrorMessage, fetchBinary, requestJson } from "@dtst/internal";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readConfig } from "../src/config";
+import { DtstError, httpError, toDtstError } from "../src/errors";
+import { api, download } from "../src/http";
+import { type FakeProvider, fakeProvider } from "./helpers";
 
-function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...headers },
-  });
-}
+let provider: FakeProvider;
+const config = () => readConfig({ OPENAI_BASE_URL: provider.url, OPENAI_API_KEY: "sk-test-123456" });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
+beforeEach(async () => {
+  provider = await fakeProvider();
 });
+afterEach(() => provider.close());
 
-describe("requestJson", () => {
-  it("parses a successful JSON response", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const response = await requestJson<{ ok: boolean }>("https://api.test/v1/thing", { maxRetries: 0 });
-    expect(response.status).toBe(200);
-    expect(response.json).toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+describe("api", () => {
+  it("sends auth and JSON, returns parsed data", async () => {
+    provider.on("POST /chat/completions", ({ json }) => ({ json: { echo: json } }));
+    const result = await api<{ echo: unknown }>(config(), "/chat/completions", { json: { a: 1 } });
+    expect(result.echo).toEqual({ a: 1 });
+    expect(provider.requests[0]?.headers["authorization"]).toBe("Bearer sk-test-123456");
   });
 
-  it("retries a 429 and succeeds, honouring a small Retry-After", async () => {
+  it("retries 429 honouring Retry-After, then succeeds", async () => {
     let calls = 0;
-    const fetchMock = vi.fn(async () => {
-      calls += 1;
-      if (calls === 1) return jsonResponse({ error: { message: "slow down" } }, 429, { "retry-after": "0" });
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const started = Date.now();
-    const response = await requestJson<{ ok: boolean }>("https://api.test/v1/thing", { maxRetries: 2 });
-    const elapsed = Date.now() - started;
-
-    expect(response.json).toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    // Retry-After: 0 must be used instead of the ~1s exponential default.
-    expect(elapsed).toBeLessThan(500);
+    provider.on("GET /models", () =>
+      ++calls < 3 ? { status: 429, headers: { "retry-after": "0" }, json: {} } : { json: { ok: true } },
+    );
+    await expect(api(config(), "/models")).resolves.toEqual({ ok: true });
+    expect(calls).toBe(3);
   });
 
-  it("throws PROVIDER_UNSUPPORTED for a 404 without retrying", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ error: { message: "model not found" } }, 404));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const error = (await requestJson("https://api.test/v1/thing", { maxRetries: 3 }).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error).toBeInstanceOf(DtstError);
-    expect(error.code).toBe("PROVIDER_UNSUPPORTED");
-    expect(error.status).toBe(404);
-    expect(error.message).toContain("model not found");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  it("does not retry client errors and maps them to codes", async () => {
+    provider.on("GET /models", { status: 401, json: { error: { message: "bad key" } } });
+    const error = await api(config(), "/models").catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ code: "AUTH", message: "bad key", status: 401 });
+    expect(provider.requests).toHaveLength(1);
   });
 
-  it("maps a 401 to PROVIDER_AUTH without retrying", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ message: "bad key" }, 401));
-    vi.stubGlobal("fetch", fetchMock);
-    const error = (await requestJson("https://api.test/v1/thing", { maxRetries: 3 }).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error.code).toBe("PROVIDER_AUTH");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  it("treats an error object inside a 200 body as a failure", async () => {
+    provider.on("GET /models", { json: { error: { code: 402, message: "Insufficient credits" } } });
+    await expect(api(config(), "/models")).rejects.toMatchObject({ code: "CREDITS" });
   });
 
-  it("retries a 500 up to maxRetries and then throws a retryable PROVIDER_ERROR", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ error: { message: "boom" } }, 500, { "retry-after": "0" }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const error = (await requestJson("https://api.test/v1/thing", { maxRetries: 2 }).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error.code).toBe("PROVIDER_ERROR");
-    expect(error.retryable).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-
-  it("rejects a response over maxBytes", async () => {
-    vi.stubGlobal("fetch", async () => jsonResponse({ big: "x".repeat(100) }));
-    const error = (await requestJson("https://api.test/v1/thing", { maxRetries: 0, maxBytes: 10 }).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error.code).toBe("PROVIDER_ERROR");
-    expect(error.message).toContain("too large");
+  it("honours cancellation", async () => {
+    provider.on("GET /models", () => new Promise((resolve) => setTimeout(() => resolve({ json: {} }), 500)));
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 20);
+    await expect(api(config(), "/models", { signal: controller.signal })).rejects.toMatchObject({ code: "CANCELLED" });
   });
 });
 
-describe("extractErrorMessage", () => {
-  it("handles the common provider shapes", () => {
-    expect(extractErrorMessage({ error: { message: "boom" } }, "")).toBe("boom");
-    expect(extractErrorMessage({ message: "plain" }, "")).toBe("plain");
-    expect(extractErrorMessage({ error: "string error" }, "")).toBe("string error");
-    expect(extractErrorMessage({ detail: "detail message" }, "")).toBe("detail message");
-    expect(extractErrorMessage(undefined, "raw text")).toBe("raw text");
-    expect(extractErrorMessage(undefined, "   ")).toBeUndefined();
+describe("download", () => {
+  it("truncates or rejects oversized bodies", async () => {
+    provider.on("GET /big", { body: Buffer.alloc(5000, 97) });
+    const truncated = await download(`${provider.url}/big`, { maxBytes: 1000, truncate: true });
+    expect(truncated).toMatchObject({ truncated: true });
+    expect(truncated.data.length).toBe(1000);
+    await expect(download(`${provider.url}/big`, { maxBytes: 1000 })).rejects.toMatchObject({ code: "BAD_INPUT" });
   });
 });
 
-describe("fetchBinary", () => {
-  it("downloads bytes with a content type", async () => {
-    vi.stubGlobal(
-      "fetch",
-      async () => new Response(Buffer.from([1, 2, 3, 4]), { status: 200, headers: { "content-type": "image/png" } }),
-    );
-    const downloaded = await fetchBinary("https://api.test/i.png", { maxBytes: 10 });
-    expect(downloaded.data.equals(Buffer.from([1, 2, 3, 4]))).toBe(true);
-    expect(downloaded.contentType).toBe("image/png");
-    expect(downloaded.finalUrl).toBe("https://api.test/i.png");
+describe("errors", () => {
+  it("maps statuses to codes with hints", () => {
+    expect(httpError(402, "x").code).toBe("CREDITS");
+    expect(httpError(404, "x").code).toBe("UNSUPPORTED");
+    expect(httpError(400, "foo/bar is not a valid model ID").code).toBe("UNSUPPORTED");
+    expect(httpError(400, "bad request").code).toBe("PROVIDER");
+    expect(httpError(503, "x").retryable).toBe(true);
+    expect(httpError(501, "x").retryable).toBe(false);
+    expect(httpError(401, "x").toString()).toMatch(/^AUTH: x\nHint: /);
   });
 
-  it("rejects an over-large declared response", async () => {
-    vi.stubGlobal(
-      "fetch",
-      async () => new Response(Buffer.from([1]), { status: 200, headers: { "content-length": "100" } }),
-    );
-    const error = (await fetchBinary("https://api.test/big.png", { maxBytes: 2 }).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error.code).toBe("BAD_INPUT");
-  });
-
-  it("rejects an over-large body", async () => {
-    vi.stubGlobal("fetch", async () => new Response(Buffer.from([1, 2, 3, 4]), { status: 200 }));
-    const error = (await fetchBinary("https://api.test/big.png", { maxBytes: 2 }).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error.code).toBe("BAD_INPUT");
-  });
-
-  it("reports a failed download", async () => {
-    vi.stubGlobal("fetch", async () => new Response("nope", { status: 404 }));
-    const error = (await fetchBinary("https://api.test/missing.png").then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    )) as DtstError;
-    expect(error.code).toBe("PROVIDER_ERROR");
-    expect(error.status).toBe(404);
+  it("maps thrown values", () => {
+    expect(toDtstError(Object.assign(new Error("gone"), { code: "ENOENT" })).code).toBe("NOT_FOUND");
+    expect(toDtstError(new TypeError("fetch failed")).code).toBe("NETWORK");
+    expect(toDtstError("weird")).toBeInstanceOf(DtstError);
   });
 });

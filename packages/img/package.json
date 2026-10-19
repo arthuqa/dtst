@@ -1,7 +1,7 @@
 {
   "name": "@dtst/img",
   "version": "0.1.0",
-  "description": "MCP server and CLI for generating and editing images through any OpenAI-compatible API (OpenAI, OpenRouter, vLLM, Ollama, LiteLLM). Saves to agent-specified paths.",
+  "description": "MCP server for generating and editing images through any OpenAI-compatible API (OpenAI, OpenRouter, LiteLLM, local). Saves to the paths the agent asks for.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -9,7 +9,6 @@
     "image-editing",
     "openai",
     "openrouter",
-    "npx",
     "agent"
   ],
   "license": "MIT",
@@ -19,10 +18,7 @@
     "node": ">=22.14"
   },
   "bin": {
-    "img": "dist/cli.js"
-  },
-  "exports": {
-    ".": "./dist/index.js"
+    "dtst-img": "dist/index.js"
   },
   "files": [
     "dist",
@@ -40,15 +36,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup && node ../../scripts/check-bundle.mjs dist/cli.js",
+    "build": "tsup && node ../../scripts/check-bundle.mjs dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run test/unit"
+    "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
-    "dotenv": "^18.0.4",
-    "openai": "^7.23.0",
     "tinyglobby": "^0.2.17",
     "zod": "^4.6.5"
   },

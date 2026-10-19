@@ -1,7 +1,7 @@
 {
   "name": "@dtst/txt",
   "version": "0.1.0",
-  "description": "MCP server and CLI for writing text and reasoning over context with any OpenAI-compatible API (OpenAI, OpenRouter, vLLM, Ollama, LiteLLM). Accepts multiple images and saves to agent-specified paths.",
+  "description": "MCP server for text generation, file reading and vision through any OpenAI-compatible API (OpenAI, OpenRouter, LiteLLM, local).",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -10,7 +10,6 @@
     "openai",
     "openrouter",
     "vision",
-    "npx",
     "agent"
   ],
   "license": "MIT",
@@ -20,10 +19,7 @@
     "node": ">=22.14"
   },
   "bin": {
-    "txt": "dist/cli.js"
-  },
-  "exports": {
-    ".": "./dist/index.js"
+    "dtst-txt": "dist/index.js"
   },
   "files": [
     "dist",
@@ -41,15 +37,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup && node ../../scripts/check-bundle.mjs dist/cli.js",
+    "build": "tsup && node ../../scripts/check-bundle.mjs dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run test/unit"
+    "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
-    "dotenv": "^18.0.4",
-    "openai": "^7.23.0",
     "tinyglobby": "^0.2.17",
     "zod": "^4.6.5"
   },

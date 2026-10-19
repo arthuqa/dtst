@@ -88,9 +88,7 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          # Optional: the image model for the img checks when it differs from
-          # OPENAI_MODEL (the integration harness applies it to the img server).
-          DTST_TEST_IMAGE_MODEL: ${{ secrets.DTST_TEST_IMAGE_MODEL }}
+          OPENAI_IMAGE_MODEL: ${{ secrets.OPENAI_IMAGE_MODEL }}
         run: node scripts/integration-test.mjs
 
       - name: Upload integration artifacts
@@ -98,6 +96,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: integration-output
-          path: sandbox/mcp-it
+          path: sandbox/it
           if-no-files-found: ignore
           retention-days: 7

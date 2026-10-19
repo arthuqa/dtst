@@ -1,21 +1,13 @@
-/**
- * @dtst/internal — private runtime shared by `@dtst/img` and `@dtst/txt`.
- *
- * This package is never published. tsup inlines it into each bundle, and
- * `scripts/check-bundle.mjs` fails the build if that stops being true.
- */
+/** Private runtime shared by @dtst/img and @dtst/txt; inlined into each bundle by tsup. */
 
-export * from "./artifacts";
-export * from "./cli";
 export * from "./config";
-export * from "./context";
 export * from "./errors";
+export * from "./files";
 export * from "./http";
-export * from "./images";
 export * from "./log";
-export * from "./mcp";
 export * from "./mime";
-export * from "./openai";
-export * from "./paths";
-export * from "./progress";
-export * from "./version";
+export * from "./server";
+export * from "./sources";
+
+declare const __DTST_VERSION__: string | undefined;
+export const VERSION: string = typeof __DTST_VERSION__ === "string" ? __DTST_VERSION__ : "0.0.0-dev";

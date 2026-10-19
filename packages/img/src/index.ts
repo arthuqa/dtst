@@ -1,47 +1,22 @@
-/**
- * @dtst/img — MCP server and library for image generation and editing over any
- * OpenAI-compatible API.
- */
+#!/usr/bin/env node
+import { VERSION, runStdio } from "@dtst/internal";
+import { NAME, createServer } from "./server";
 
-export {
-  createImgServer,
-  runImgServer,
-  SERVER_INSTRUCTIONS,
-  type CreateImgServerOptions,
-  type ImgServerBundle,
-} from "./server";
-export {
-  runGenerate,
-  runEdit,
-  type EditOperationInput,
-  type GenerateOperationInput,
-  type OperationContext,
-  type OperationOutcome,
-  type OutputOptions,
-  type SavedImage,
-} from "./operations";
-export { createToolRuntime, type ToolRuntime } from "./runtime";
-export {
-  resolveBackend,
-  listImageModels,
-  isOpenRouter,
-  describeSelection,
-  type BackendSelection,
-} from "./backends/select";
-export type {
-  BackendCapabilities,
-  BackendContext,
-  BackendKind,
-  EditRequest,
-  GenerateRequest,
-  ImageBackend,
-  ImageModelInfo,
-  ImageResult,
-  RenderedImage,
-  Usage,
-} from "./backends/types";
-export { ChatModalitiesBackend } from "./backends/chat-modalities";
-export { OpenAIImagesBackend } from "./backends/openai-images";
-export { OpenRouterImagesBackend } from "./backends/openrouter-images";
-export { buildPrompt, filenameFromPrompt, normalizePrompt } from "./prompt";
-export { imgErrors, ERROR_UNSUPPORTED } from "./errors";
+const HELP = `
+${NAME} ${VERSION} — MCP server: generate and edit images via any OpenAI-compatible API.
+
+Tools:  generate_image · edit_image · list_image_models
+
+Environment:
+  OPENAI_BASE_URL      API root (default https://api.openai.com/v1)
+  OPENAI_API_KEY       API key (optional for local endpoints)
+  OPENAI_IMAGE_MODEL   default image model (falls back to OPENAI_MODEL)
+  DTST_WORKSPACE       root for relative paths (default: client root, else cwd)
+  DTST_IMAGE_API       auto | images | openrouter | chat (default auto)
+  DTST_TIMEOUT_MS      request timeout (default 300000)
+  DEBUG=1              verbose logs on stderr
+
+A .env file in the working directory is loaded too.
+`;
+
+await runStdio(createServer, { name: NAME, version: VERSION, help: HELP });
